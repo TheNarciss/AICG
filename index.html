@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGPU Scene Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/mode/simple.min.js"></script>
+    
+    <style>
+        /* Gruvbox Dark Theme for CodeMirror */
+        .cm-s-gruvbox-dark.CodeMirror {
+            background-color: #1d2021;
+            color: #ebdbb2;
+            height: 100%;
+        }
+        .cm-s-gruvbox-dark .CodeMirror-gutters {
+            background-color: #1d2021;
+            border-right: 1px solid #3c3836;
+        }
+        .cm-s-gruvbox-dark .CodeMirror-linenumber {
+            color: #7c6f64;
+        }
+        .cm-s-gruvbox-dark .CodeMirror-cursor {
+            border-left: 1px solid #ebdbb2;
+        }
+        .cm-s-gruvbox-dark span.cm-comment {
+            color: #928374;
+        }
+        .cm-s-gruvbox-dark span.cm-keyword {
+            color: #fb4934;
+        }
+        .cm-s-gruvbox-dark span.cm-variable {
+            color: #83a598;
+        }
+        .cm-s-gruvbox-dark span.cm-type {
+            color: #fabd2f;
+        }
+        .cm-s-gruvbox-dark span.cm-string {
+            color: #b8bb26;
+        }
+        .cm-s-gruvbox-dark span.cm-number {
+            color: #d3869b;
+        }
+
+        /* Custom Slider Styles */
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: #3c3836;
+            border-radius: 4px;
+            height: 8px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #83a598;
+            cursor: pointer;
+            border: 2px solid #1d2021;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #8ec07c;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #83a598;
+            cursor: pointer;
+            border: 2px solid #1d2021;
+        }
+
+        /* Layout */
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+        #container {
+            position: relative;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+        }
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        #editor-side {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 50%;
+            max-width: 800px;
+            height: calc(100vh - 40px);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        
+        #editor-side.panel-hidden {
+            transform: translateX(calc(100% + 20px));
+            opacity: 0;
+            pointer-events: none;
+        }
+        #editor-main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        #code-editor-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .CodeMirror {
+            flex: 1;
+            height: auto;
+            width: 100%;
+            max-width: 100%;
+            -webkit-box-sizing: border-box;
+            box-sizing: border-box;
+        }
+        
+        /* Side panel styles */
+        #side-panel {
+            width: 300px;
+            min-width: 300px;
+            max-width: 300px;
+            background: #1d2021;
+            overflow-y: auto;
+            overflow-x: hidden;
+            border-left: 1px solid #3c3836;
+        }
+        #side-panel {
+            width: 288px;
+            min-width: 288px;
+            max-width: 288px;
+            flex: 0 0 288px;
+            background: #1d2021;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-gray-200">
+    <div id="container">
+        
+        <!-- ================================ -->
+        <!-- LEFT: CANVAS VIEWPORT -->
+        <!-- ================================ -->
+        <div id="canvas-container" class="relative bg-black flex items-center justify-center">
+            <canvas id="canvas" class="block"></canvas>
+            
+            <!-- Error Display -->
+            <div id="error-message" class="absolute bottom-4 left-4 right-4 bg-red-900/90 text-red-200 p-3 rounded text-xs font-mono hidden max-h-32 overflow-auto">
+            </div>
+            
+            <!-- FPS Counter -->
+            <div class="absolute top-4 left-4 bg-black/70 px-3 py-2 rounded text-sm font-mono">
+                <span class="text-gray-400">FPS:</span> <span id="fps" class="text-green-400">0</span>
+            </div>
+            
+            <!-- Floating Toggle Button (visible when panel is closed) -->
+            <button id="floating-toggle-btn" class="absolute top-4 right-4 bg-blue-700 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-lg transition hidden" style="z-index: 5;">
+                🎨 Show Editor
+            </button>
+        </div>
+        
+        <!-- ================================ -->
+        <!-- RIGHT: EDITOR + PANELS -->
+        <!-- ================================ -->
+        <div id="editor-side" class="bg-gray-800">
+            
+            <!-- Header -->
+            <div class="bg-[#1d2021] border-b border-gray-700 p-3 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-blue-400">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
+                        <path d="M2 17L12 22L22 17"/>
+                        <path d="M2 12L12 17L22 12"/>
+                    </svg>
+                    <span class="font-bold text-gray-200">WebGPU Scene Editor</span>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <select id="shader-selector" class="bg-[#3c3836] text-gray-200 px-3 py-1 rounded text-sm border border-gray-600">
+                        <option value="">-- Select Shader --</option>
+                    </select>
+                    <button id="compile-btn" class="bg-green-700 hover:bg-green-600 text-white px-4 py-1 rounded text-sm font-semibold transition">
+                        Compile
+                    </button>
+                    <button id="toggle-panel-btn" class="bg-blue-700 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm font-semibold transition" title="Toggle Scene Panel">
+                        🎨 Panel
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Editor + Side Panel -->
+            <div id="editor-main">
+                
+                <!-- Code Editor -->
+                <div id="code-editor-wrapper">
+                    <textarea id="code-editor"></textarea>
+                </div>
+                
+                <!-- Side Panel (Uniforms + Scene Editor) -->
+                <div id="side-panel" class="w-72 bg-[#1d2021] border-l border-gray-700 overflow-y-auto">
+                    
+                    <!-- ================================ -->
+                    <!-- SYSTEM UNIFORMS -->
+                    <!-- ================================ -->
+                    <div class="p-4 border-b border-gray-700">
+                        <h3 class="font-bold text-gray-200 mb-3 flex items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"/>
+                                <rect x="14" y="3" width="7" height="7"/>
+                                <rect x="14" y="14" width="7" height="7"/>
+                                <rect x="3" y="14" width="7" height="7"/>
+                            </svg>
+                            System Uniforms
+                        </h3>
+                        <div class="space-y-2 text-xs font-mono text-gray-400">
+                            <div><span class="text-gray-500">Resolution:</span> <span id="u-resolution">0x0</span></div>
+                            <div><span class="text-gray-500">Time:</span> <span id="u-time">0.00s</span></div>
+                            <div><span class="text-gray-500">Frame:</span> <span id="u-frame">0</span></div>
+                            <div><span class="text-gray-500">Mouse:</span> <span id="u-mouse">(0, 0)</span></div>
+                        </div>
+                    </div>
+                    
+                    <!-- ================================ -->
+                    <!-- SCENE EDITOR (À IMPLÉMENTER) -->
+                    <!-- ================================ -->
+                    <div class="p-4">
+                        <h3 class="font-bold text-gray-200 mb-3 flex items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-blue-400">
+                                <circle cx="12" cy="12" r="10"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            🎨 Scene Editor
+                        </h3>
+                        
+                        <!-- SPHERE CONTROLS (Phase 2) -->
+                        <div id="sphere-controls" class="space-y-3">
+                            <div class="text-sm font-semibold text-blue-400">🔵 Sphere</div>
+                            
+                            <!-- Position X -->
+                            <div>
+                                <label class="text-xs flex justify-between mb-1">
+                                    <span class="text-gray-400">Position X</span>
+                                    <span id="sphere-x-value" class="font-mono text-yellow-400">0.00</span>
+                                </label>
+                                <input type="range" id="sphere-x" min="-3" max="3" step="0.01" value="0" class="w-full">
+                            </div>
+                            
+                            <!-- Position Y -->
+                            <div>
+                                <label class="text-xs flex justify-between mb-1">
+                                    <span class="text-gray-400">Position Y</span>
+                                    <span id="sphere-y-value" class="font-mono text-yellow-400">0.00</span>
+                                </label>
+                                <input type="range" id="sphere-y" min="-2" max="2" step="0.01" value="0" class="w-full">
+                            </div>
+                            
+                            <!-- Position Z -->
+                            <div>
+                                <label class="text-xs flex justify-between mb-1">
+                                    <span class="text-gray-400">Position Z</span>
+                                    <span id="sphere-z-value" class="font-mono text-yellow-400">0.00</span>
+                                </label>
+                                <input type="range" id="sphere-z" min="-3" max="3" step="0.01" value="0" class="w-full">
+                            </div>
+                            
+                            <!-- Radius -->
+                            <div>
+                                <label class="text-xs flex justify-between mb-1">
+                                    <span class="text-gray-400">Radius</span>
+                                    <span id="sphere-radius-value" class="font-mono text-yellow-400">0.50</span>
+                                </label>
+                                <input type="range" id="sphere-radius" min="0.1" max="2.0" step="0.01" value="0.5" class="w-full">
+                            </div>
+                            
+                            <!-- Color -->
+                            <div>
+                                <label class="text-xs block mb-1 text-gray-400">Color</label>
+                                <input type="color" id="sphere-color" value="#ff4d4d" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600">
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================================================
+        // GLOBAL VARIABLES
+        // ================================================
+        let device, context, pipeline, bindGroup;
+        let uniformBuffer, sceneBuffer;
+        let canvas, editor;
+        let sceneData;
+        
+        let startTime = performance.now();
+        let lastFrameTime = startTime;
+        let frameCount = 0;
+        let lastFpsUpdate = startTime;
+        
+        let mouseX = 0, mouseY = 0, mouseDown = 0;
+        
+        // ================================================
+        // WGSL SHADERS
+        // ================================================
+        
+        // Vertex Shader (fullscreen triangle)
+        const vertexShader = `
+@vertex
+fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f32> {
+    var pos = array<vec2<f32>, 3>(
+        vec2<f32>(-1.0, -1.0),
+        vec2<f32>(3.0, -1.0),
+        vec2<f32>(-1.0, 3.0)
+    );
+    return vec4<f32>(pos[vertexIndex], 0.0, 1.0);
+}
+`;
+
+        // Uniforms Structure
+        const uniformsStruct = `
+struct Uniforms {
+    resolution: vec2<f32>,
+    time: f32,
+    deltaTime: f32,
+    mouse: vec4<f32>,
+    frame: u32,
+    _padding: u32,
+    _padding2: u32,
+    _padding3: u32,
+}
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+`;
+
+        // Scene Structure (Phase 1) - Empty, defined in shader
+        const sceneStruct = ``;
+
+        // Fallback Fragment Shader
+        const fallbackShader = `
+@fragment
+fn fs_main(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
+    let uv = fragCoord.xy / uniforms.resolution;
+    let col = vec3<f32>(uv.x, uv.y, 0.5 + 0.5 * sin(uniforms.time));
+    return vec4<f32>(col, 1.0);
+}
+`;
+
+        // ================================================
+        // WEBGPU INITIALIZATION
+        // ================================================
+        
+        async function initWebGPU() {
+            canvas = document.getElementById('canvas');
+            
+            // Check WebGPU support
+            if (!navigator.gpu) {
+                showError('WebGPU not supported in this browser. Use Chrome 113+ or Edge 113+');
+                return false;
+            }
+            
+            const adapter = await navigator.gpu.requestAdapter();
+            if (!adapter) {
+                showError('No GPU adapter found');
+                return false;
+            }
+            
+            device = await adapter.requestDevice();
+            context = canvas.getContext('webgpu');
+            const format = navigator.gpu.getPreferredCanvasFormat();
+            context.configure({ device, format });
+            
+            // Create uniform buffer (system uniforms)
+            uniformBuffer = device.createBuffer({
+                size: 64, // 2*f32 + f32 + f32 + 4*f32 + u32 + 3*u32 = 16 floats = 64 bytes
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+                label: 'Uniform Buffer'
+            });
+            
+            // Create scene buffer (Phase 1)
+            sceneData = new Float32Array([
+                // Sphere center (vec3 + padding)
+                0.0, 0.0, 0.0,
+                // Sphere radius
+                0.5,
+                // Sphere color (vec3 + padding)
+                1.0, 0.3, 0.3,
+                // Padding
+                0.0
+            ]);
+            
+            sceneBuffer = device.createBuffer({
+                size: sceneData.byteLength, // 8 * 4 = 32 bytes
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+                label: 'Scene Buffer'
+            });
+            
+            device.queue.writeBuffer(sceneBuffer, 0, sceneData);
+            
+            // Compile default shader
+            await compileShader(fallbackShader);
+            
+            return true;
+        }
+        
+        // ================================================
+        // SHADER COMPILATION
+        // ================================================
+        
+        async function compileShader(fragmentCode) {
+            try {
+                hideError();
+                
+                const code = vertexShader + '\n' + uniformsStruct + '\n' + sceneStruct + '\n' + fragmentCode;
+                const shaderModule = device.createShaderModule({ code });
+                
+                const info = await shaderModule.getCompilationInfo();
+                const errors = info.messages.filter(m => m.type === 'error');
+                
+                if (errors.length > 0) {
+                    const errorText = errors.map(e => `Line ${e.lineNum}: ${e.message}`).join('\n');
+                    showError('Shader compilation error:\n' + errorText);
+                    return;
+                }
+                
+                const format = navigator.gpu.getPreferredCanvasFormat();
+                
+                const bindGroupLayout = device.createBindGroupLayout({
+                    entries: [
+                        {
+                            binding: 0,
+                            visibility: GPUShaderStage.FRAGMENT,
+                            buffer: { type: 'uniform' }
+                        },
+                        {
+                            binding: 1,
+                            visibility: GPUShaderStage.FRAGMENT,
+                            buffer: { type: 'uniform' }
+                        }
+                    ]
+                });
+                
+                pipeline = device.createRenderPipeline({
+                    layout: device.createPipelineLayout({
+                        bindGroupLayouts: [bindGroupLayout]
+                    }),
+                    vertex: {
+                        module: shaderModule,
+                        entryPoint: 'vs_main'
+                    },
+                    fragment: {
+                        module: shaderModule,
+                        entryPoint: 'fs_main',
+                        targets: [{ format }]
+                    },
+                    primitive: {
+                        topology: 'triangle-list'
+                    }
+                });
+                
+                bindGroup = device.createBindGroup({
+                    layout: bindGroupLayout,
+                    entries: [
+                        { binding: 0, resource: { buffer: uniformBuffer } },
+                        { binding: 1, resource: { buffer: sceneBuffer } }
+                    ]
+                });
+                
+                console.log('✅ Shader compiled successfully');
+                
+            } catch (e) {
+                showError('Compilation error: ' + e.message);
+                console.error(e);
+            }
+        }
+        
+        // ================================================
+        // RENDER LOOP
+        // ================================================
+        
+        function render() {
+            if (!pipeline) {
+                requestAnimationFrame(render);
+                return;
+            }
+            
+            const currentTime = performance.now();
+            const deltaTime = (currentTime - lastFrameTime) / 1000;
+            const elapsedTime = (currentTime - startTime) / 1000;
+            
+            // Update uniform buffer
+            const uniformData = new Float32Array([
+                canvas.width, canvas.height,  // resolution
+                elapsedTime,                   // time
+                deltaTime,                     // deltaTime
+                mouseX, mouseY, mouseDown, 0,  // mouse (x, y, pressed, padding)
+                frameCount, 0, 0, 0            // frame + padding
+            ]);
+            device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+            
+            // Update UI displays
+            document.getElementById('u-resolution').textContent = `${canvas.width}x${canvas.height}`;
+            document.getElementById('u-time').textContent = elapsedTime.toFixed(2) + 's';
+            document.getElementById('u-frame').textContent = frameCount;
+            document.getElementById('u-mouse').textContent = `(${mouseX.toFixed(0)}, ${mouseY.toFixed(0)})`;
+            
+            // Render pass
+            const encoder = device.createCommandEncoder();
+            const pass = encoder.beginRenderPass({
+                colorAttachments: [{
+                    view: context.getCurrentTexture().createView(),
+                    loadOp: 'clear',
+                    clearValue: { r: 0, g: 0, b: 0, a: 1 },
+                    storeOp: 'store'
+                }]
+            });
+            
+            pass.setPipeline(pipeline);
+            pass.setBindGroup(0, bindGroup);
+            pass.draw(3);
+            pass.end();
+            
+            device.queue.submit([encoder.finish()]);
+            
+            // Update FPS
+            frameCount++;
+            if (currentTime - lastFpsUpdate > 100) {
+                const fps = Math.round(frameCount / ((currentTime - lastFpsUpdate) / 1000));
+                document.getElementById('fps').textContent = fps;
+                frameCount = 0;
+                lastFpsUpdate = currentTime;
+            }
+            
+            lastFrameTime = currentTime;
+            requestAnimationFrame(render);
+        }
+        
+        // ================================================
+        // SCENE EDITOR CONTROLS (Phase 2)
+        // ================================================
+        
+        function setupSceneEditor() {
+            const sphereX = document.getElementById('sphere-x');
+            const sphereY = document.getElementById('sphere-y');
+            const sphereZ = document.getElementById('sphere-z');
+            const sphereRadius = document.getElementById('sphere-radius');
+            const sphereColor = document.getElementById('sphere-color');
+            
+            function updateScene() {
+                // Update sceneData array
+                sceneData[0] = parseFloat(sphereX.value);
+                sceneData[1] = parseFloat(sphereY.value);
+                sceneData[2] = parseFloat(sphereZ.value);
+                sceneData[3] = parseFloat(sphereRadius.value);
+                
+                // Convert hex color to RGB
+                const hex = sphereColor.value;
+                const r = parseInt(hex.slice(1, 3), 16) / 255.0;
+                const g = parseInt(hex.slice(3, 5), 16) / 255.0;
+                const b = parseInt(hex.slice(5, 7), 16) / 255.0;
+                sceneData[4] = r;
+                sceneData[5] = g;
+                sceneData[6] = b;
+                
+                // Upload to GPU
+                if (device && sceneBuffer) {
+                    device.queue.writeBuffer(sceneBuffer, 0, sceneData);
+                }
+                
+                // Update displays
+                document.getElementById('sphere-x-value').textContent = parseFloat(sphereX.value).toFixed(2);
+                document.getElementById('sphere-y-value').textContent = parseFloat(sphereY.value).toFixed(2);
+                document.getElementById('sphere-z-value').textContent = parseFloat(sphereZ.value).toFixed(2);
+                document.getElementById('sphere-radius-value').textContent = parseFloat(sphereRadius.value).toFixed(2);
+            }
+            
+            // Attach event listeners
+            sphereX.addEventListener('input', updateScene);
+            sphereY.addEventListener('input', updateScene);
+            sphereZ.addEventListener('input', updateScene);
+            sphereRadius.addEventListener('input', updateScene);
+            sphereColor.addEventListener('input', updateScene);
+            
+            // Initialize
+            updateScene();
+        }
+        
+        // ================================================
+        // SHADER LOADER
+        // ================================================
+        
+        async function loadShaders() {
+            try {
+                const response = await fetch('shaders/manifest.json');
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch manifest: ${response.status}`);
+                }
+                const manifest = await response.json();
+                
+                const selector = document.getElementById('shader-selector');
+                
+                for (const shader of manifest.shaders) {
+                    const option = document.createElement('option');
+                    option.value = shader.file;
+                    option.textContent = shader.name;
+                    selector.appendChild(option);
+                }
+                
+                console.log('✅ Loaded', manifest.shaders.length, 'shaders');
+                
+                // Load raymarch_basic by default (the main project shader)
+                const defaultShader = 'raymarch_basic.wgsl';
+                const defaultShaderName = 'Ray Marching - Basic';
+                
+                // Find raymarch_basic in the list
+                const raymarchShader = manifest.shaders.find(s => s.file === defaultShader);
+                
+                if (raymarchShader) {
+                    try {
+                        const shaderCode = await fetch(`shaders/${defaultShader}`).then(r => {
+                            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                            return r.text();
+                        });
+                        editor.setValue(shaderCode);
+                        selector.value = defaultShader;
+                        await compileShader(shaderCode);
+                        console.log('✅ Compiled default shader:', defaultShader);
+                    } catch (err) {
+                        console.error('❌ Failed to load default shader:', err);
+                        showError(`Failed to load ${defaultShader}: ${err.message}`);
+                    }
+                } else {
+                    console.warn('⚠️ raymarch_basic.wgsl not found in manifest');
+                    showError('Main shader not found. Please select a shader from the dropdown.');
+                }
+                
+                // Selector change event
+                selector.addEventListener('change', async (e) => {
+                    if (e.target.value) {
+                        try {
+                            const shaderCode = await fetch(`shaders/${e.target.value}`).then(r => r.text());
+                            editor.setValue(shaderCode);
+                            await compileShader(shaderCode);
+                        } catch (err) {
+                            showError('Failed to load shader: ' + err.message);
+                        }
+                    }
+                });
+                
+            } catch (e) {
+                console.error('❌ Failed to load shaders:', e);
+                showError('Failed to load shader list. Check console for details.');
+            }
+        }
+        
+        // ================================================
+        // UTILITY FUNCTIONS
+        // ================================================
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+        
+        function hideError() {
+            document.getElementById('error-message').classList.add('hidden');
+        }
+        
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            const dpr = window.devicePixelRatio || 1;
+            
+            // Limit canvas size to avoid GPU errors
+            const maxWidth = 8192;
+            const maxHeight = 8192;
+            
+            let width = container.clientWidth * dpr;
+            let height = container.clientHeight * dpr;
+            
+            // Clamp to maximum texture size
+            if (width > maxWidth) width = maxWidth;
+            if (height > maxHeight) height = maxHeight;
+            
+            canvas.width = width;
+            canvas.height = height;
+            canvas.style.width = container.clientWidth + 'px';
+            canvas.style.height = container.clientHeight + 'px';
+        }
+        
+        // ================================================
+        // CODEMIRROR SETUP
+        // ================================================
+        
+        CodeMirror.defineSimpleMode("wgsl", {
+            start: [
+                {regex: /\/\/.*/, token: "comment"},
+                {regex: /fn|struct|let|var|if|else|for|return|const/, token: "keyword"},
+                {regex: /vec[234]|mat[234]x[234]|f32|i32|u32|bool/, token: "type"},
+                {regex: /\d+\.\d+|\d+/, token: "number"},
+                {regex: /"(?:[^\\]|\\.)*?"/, token: "string"},
+                {regex: /[a-zA-Z_]\w*/, token: "variable"}
+            ]
+        });
+        
+        // ================================================
+        // INITIALIZATION
+        // ================================================
+        
+        (async () => {
+            // Initialize WebGPU
+            if (!(await initWebGPU())) {
+                return;
+            }
+            
+            // Setup CodeMirror
+            const textarea = document.getElementById('code-editor');
+            editor = CodeMirror.fromTextArea(textarea, {
+                mode: 'wgsl',
+                theme: 'gruvbox-dark',
+                lineNumbers: true,
+                lineWrapping: true,
+                indentUnit: 2,
+                tabSize: 2
+            });
+            
+            // Setup Scene Editor
+            setupSceneEditor();
+            
+            // Setup panel toggle button
+            const togglePanelBtn = document.getElementById('toggle-panel-btn');
+            const floatingToggleBtn = document.getElementById('floating-toggle-btn');
+            const editorSide = document.getElementById('editor-side');
+            let panelVisible = true;
+            
+            function togglePanel() {
+                panelVisible = !panelVisible;
+                if (panelVisible) {
+                    editorSide.classList.remove('panel-hidden');
+                    togglePanelBtn.textContent = '✖️ Close';
+                    togglePanelBtn.classList.remove('bg-gray-600');
+                    togglePanelBtn.classList.add('bg-red-700');
+                    floatingToggleBtn.classList.add('hidden');
+                } else {
+                    editorSide.classList.add('panel-hidden');
+                    togglePanelBtn.textContent = '🎨 Show';
+                    togglePanelBtn.classList.remove('bg-red-700');
+                    togglePanelBtn.classList.add('bg-gray-600');
+                    floatingToggleBtn.classList.remove('hidden');
+                }
+            }
+            
+            togglePanelBtn.addEventListener('click', togglePanel);
+            floatingToggleBtn.addEventListener('click', togglePanel);
+            
+            // Setup mouse events
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+                mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+            });
+            
+            canvas.addEventListener('mousedown', () => { mouseDown = 1; });
+            canvas.addEventListener('mouseup', () => { mouseDown = 0; });
+            canvas.addEventListener('mouseleave', () => { mouseDown = 0; });
+            
+            // Load shaders
+            await loadShaders();
+            
+            // Compile button
+            document.getElementById('compile-btn').addEventListener('click', () => {
+                compileShader(editor.getValue());
+            });
+            
+            // Keyboard shortcut: Ctrl/Cmd+Enter to compile
+            editor.setOption('extraKeys', {
+                'Ctrl-Enter': () => compileShader(editor.getValue()),
+                'Cmd-Enter': () => compileShader(editor.getValue())
+            });
+            
+            // Resize canvas
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Start render loop
+            render();
+            
+            console.log('✅ WebGPU Scene Editor initialized');
+        })();
+    </script>
+</body>
+</html>
