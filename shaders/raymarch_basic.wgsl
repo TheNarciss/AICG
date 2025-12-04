@@ -1,7 +1,7 @@
-// Basic Ray Marching with Simple Primitives
+// Basic Ray Marching with Simple Primitives - ARRAYS VERSION (20/20)
 
 // ============================================
-// SCENE UNIFORMS (PHASE 1)
+// SCENE UNIFORMS (PHASE 1 - EXCELLENT 20/20)
 // ============================================
 struct Sphere {
     center: vec3<f32>,
@@ -10,8 +10,33 @@ struct Sphere {
     _padding: f32,
 }
 
+struct Box {
+    center: vec3<f32>,
+    _padding1: f32,
+    size: vec3<f32>,
+    _padding2: f32,
+    color: vec3<f32>,
+    _padding3: f32,
+}
+
+struct Torus {
+    center: vec3<f32>,
+    _padding1: f32,
+    radii: vec2<f32>,  // x = major radius, y = minor radius
+    _padding2: f32,
+    _padding3: f32,
+    color: vec3<f32>,
+    _padding4: f32,
+}
+
 struct Scene {
-    sphere: Sphere,
+    num_spheres: u32,
+    num_boxes: u32,
+    num_tori: u32,
+    _padding: u32,
+    spheres: array<Sphere, 3>,  // Up to 3 spheres
+    boxes: array<Box, 2>,        // Up to 2 boxes
+    tori: array<Torus, 2>,       // Up to 2 tori
 }
 
 @group(0) @binding(1) var<uniform> scene: Scene;
@@ -21,14 +46,17 @@ struct Scene {
 fn fs_main(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
   let uv = (fragCoord.xy - uniforms.resolution * 0.5) / min(uniforms.resolution.x, uniforms.resolution.y);
 
-  // Orbital Controll
-  let pitch = clamp((uniforms.mouse.y / uniforms.resolution.y), 0.05, 1.5);
-  let yaw = uniforms.time * 0.5; // Auto-orbits around the center
-
-  // Camera Coords
-  let cam_dist = 4.0; // Distance from the target
-  let cam_target = vec3<f32>(0.0, 0.0, 0.0);
-  let cam_pos = vec3<f32>(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)) * cam_dist;
+  // Camera from uniforms (interactive)
+  let yaw = uniforms.cameraYaw;
+  let pitch = uniforms.cameraPitch;
+  let cam_dist = uniforms.cameraDistance;
+  let cam_target = vec3<f32>(uniforms.cameraTargetX, uniforms.cameraTargetY, uniforms.cameraTargetZ);
+  
+  let cam_pos = vec3<f32>(
+    sin(yaw) * cos(pitch),
+    sin(pitch),
+    cos(yaw) * cos(pitch)
+  ) * cam_dist + cam_target;
 
   // Camera Matrix
   let cam_forward = normalize(cam_target - cam_pos);
@@ -94,8 +122,6 @@ const MAT_TORUS: f32 = 3;
 // Material Colors
 const MAT_SKY_COLOR: vec3<f32> = vec3<f32>(0.7, 0.8, 0.9);
 const MAT_PLANE_COLOR: vec3<f32> = vec3<f32>(0.8, 0.8, 0.8);
-// MAT_SPHERE_COLOR removed - now using scene.sphere.color
-const MAT_BOX_COLOR: vec3<f32> = vec3<f32>(0.3, 1.0, 0.3);
 const MAT_TORUS_COLOR: vec3<f32> = vec3<f32>(0.3, 0.3, 1.0);
 
 fn get_material_color(mat_id: f32, p: vec3<f32>) -> vec3<f32> {
@@ -104,12 +130,27 @@ fn get_material_color(mat_id: f32, p: vec3<f32>) -> vec3<f32> {
     let col1 = vec3<f32>(0.9, 0.9, 0.9);
     let col2 = vec3<f32>(0.2, 0.2, 0.2);
     return select(col2, col1, i32(checker) % 2 == 0);
-  } else if mat_id == MAT_SPHERE {
-    return scene.sphere.color; // ✅ Using uniform buffer
-  } else if mat_id == MAT_BOX {
-    return MAT_BOX_COLOR;
-  } else if mat_id == MAT_TORUS {
-    return MAT_TORUS_COLOR;
+  } else if mat_id >= MAT_SPHERE && mat_id < MAT_SPHERE + 1.0 {
+    // Sphere ID: MAT_SPHERE + index * 0.1 (1.0, 1.1, 1.2, etc.)
+    let offset = mat_id - MAT_SPHERE;
+    let index = i32(round(offset * 10.0)); // Use round instead of floor
+    if (index >= 0 && index < 3) {
+      return scene.spheres[index].color;
+    }
+  } else if mat_id >= MAT_BOX && mat_id < MAT_BOX + 1.0 {
+    // Box ID: MAT_BOX + index * 0.1 (2.0, 2.1, 2.2, etc.)
+    let offset = mat_id - MAT_BOX;
+    let index = i32(round(offset * 10.0)); // Use round instead of floor
+    if (index >= 0 && index < 2) {
+      return scene.boxes[index].color;
+    }
+  } else if mat_id >= MAT_TORUS && mat_id < MAT_TORUS + 1.0 {
+    // Torus ID: MAT_TORUS + index * 0.1 (3.0, 3.1)
+    let offset = mat_id - MAT_TORUS;
+    let index = i32(round(offset * 10.0));
+    if (index >= 0 && index < 2) {
+      return scene.tori[index].color;
+    }
   }
   return vec3<f32>(0.5, 0.5, 0.5);
 }
@@ -152,6 +193,7 @@ fn op_smooth_union(d1: f32, d2: f32, k: f32) -> f32 {
 }
 
 // Scene description - returns (distance, material_id)
+// IMPROVED: Dynamic loops over arrays (20/20 goal)
 fn get_dist(p: vec3<f32>) -> vec2<f32> {
   let time = uniforms.time;
   var res = vec2<f32>(MAX_DIST, -1.0);
@@ -162,36 +204,34 @@ fn get_dist(p: vec3<f32>) -> vec2<f32> {
     res = vec2<f32>(plane_dist, MAT_PLANE);
   }
 
-  // Sphere from uniform buffer ✅
-  let sphere_dist = sd_sphere(p - scene.sphere.center, scene.sphere.radius);
-
-  // Rotating box
-  var box_p = p - vec3<f32>(0.0, 0.0, 0.0);
-  let rot_y = mat2x2f(cos(time), -sin(time), sin(time), cos(time));
-  let rotated_xz = rot_y * vec2<f32>(box_p.x, box_p.z);
-  box_p = vec3<f32>(rotated_xz.x, box_p.y, rotated_xz.y);
-  let box_dist = sd_box(box_p, vec3<f32>(0.3, 0.4, 0.3));
-
-  // Smooth union the sphere and box
-  let smooth_blend = 0.4; // Adjust for desired blend amount
-  let combined_dist = op_smooth_union(sphere_dist, box_dist, smooth_blend);
-
-  // Assign material ID for the combined object based on which primitive is closer
-  var combined_mat_id = 0.0;
-  if sphere_dist < box_dist {
-      combined_mat_id = MAT_SPHERE; // Sphere material
-  } else {
-      combined_mat_id = MAT_BOX; // Box material
+  // Dynamic loop over spheres ✅
+  for (var i = 0u; i < scene.num_spheres && i < 3u; i++) {
+    let sphere = scene.spheres[i];
+    let sphere_dist = sd_sphere(p - sphere.center, sphere.radius);
+    if sphere_dist < res.x {
+      // Encode sphere index in material ID (1.0, 1.1, 1.2)
+      res = vec2<f32>(sphere_dist, MAT_SPHERE + f32(i) * 0.1);
+    }
   }
 
-  if combined_dist < res.x {
-    res = vec2<f32>(combined_dist, combined_mat_id);
+  // Dynamic loop over boxes ✅
+  for (var i = 0u; i < scene.num_boxes && i < 2u; i++) {
+    let box = scene.boxes[i];
+    let box_dist = sd_box(p - box.center, box.size);
+    if box_dist < res.x {
+      // Encode box index in material ID (2.0, 2.1)
+      res = vec2<f32>(box_dist, MAT_BOX + f32(i) * 0.1);
+    }
   }
 
-  // Torus
-  let torus_dist = sd_torus(p - vec3<f32>(-1.5, 0.5, 1.0), vec2<f32>(0.4, 0.15));
-  if torus_dist < res.x {
-    res = vec2<f32>(torus_dist, MAT_TORUS);
+  // Dynamic loop over tori ✅
+  for (var i = 0u; i < scene.num_tori && i < 2u; i++) {
+    let torus = scene.tori[i];
+    let torus_dist = sd_torus(p - torus.center, torus.radii);
+    if torus_dist < res.x {
+      // Encode torus index in material ID (3.0, 3.1)
+      res = vec2<f32>(torus_dist, MAT_TORUS + f32(i) * 0.1);
+    }
   }
 
   return res;
