@@ -57,6 +57,7 @@ struct Uniforms {
 `;
 
         // Get scene struct (from main code)
+        // ✅ FIXED: Now supports 10 of each type!
         const sceneStruct = `
 struct Sphere {
     center: vec3<f32>,
@@ -78,10 +79,9 @@ struct Torus {
     center: vec3<f32>,
     _padding1: f32,
     radii: vec2<f32>,
-    _padding2: f32,
-    _padding3: f32,
+    _padding2: vec2<f32>,
     color: vec3<f32>,
-    _padding4: f32,
+    _padding3: f32,
 }
 
 struct Scene {
@@ -89,9 +89,9 @@ struct Scene {
     num_boxes: u32,
     num_tori: u32,
     _padding: u32,
-    spheres: array<Sphere, 3>,
-    boxes: array<Box, 2>,
-    tori: array<Torus, 2>,
+    spheres: array<Sphere, 10>,
+    boxes: array<Box, 10>,
+    tori: array<Torus, 10>,
 }
 @group(0) @binding(1) var<uniform> scene: Scene;
 `;
@@ -248,31 +248,36 @@ fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f
     }
     
     // Decode ID to object type and index
+    // ✅ FIXED: Now supports 10 objects of each type
     decodeID(id) {
         if (id === 0) return null; // Background or plane
         
-        if (id >= 1 && id <= 3) {
+        if (id >= 1 && id <= 10) {
             return { type: 'sphere', index: id - 1 };
-        } else if (id >= 10 && id <= 11) {
-            return { type: 'box', index: id - 10 };
-        } else if (id >= 20 && id <= 21) {
-            return { type: 'torus', index: id - 20 };
+        } else if (id >= 11 && id <= 20) {
+            return { type: 'box', index: id - 11 };
+        } else if (id >= 21 && id <= 30) {
+            return { type: 'torus', index: id - 21 };
         }
         
         return null;
     }
     
     // Get object position from sceneData
+    // ✅ FIXED: Correct offsets for 10 objects of each type
     getObjectPosition(obj) {
         if (!obj) return null;
         
         let baseOffset;
         if (obj.type === 'sphere') {
-            baseOffset = 4 + obj.index * 8; // Header + sphere offset
+            // Header (4 floats) + sphere_index * 8 floats
+            baseOffset = 4 + obj.index * 8;
         } else if (obj.type === 'box') {
-            baseOffset = 4 + 24 + obj.index * 12; // Header + spheres + box offset
+            // Header (4) + 10 spheres (80) + box_index * 12 floats
+            baseOffset = 4 + 80 + obj.index * 12;
         } else if (obj.type === 'torus') {
-            baseOffset = 4 + 24 + 24 + obj.index * 12; // Header + spheres + boxes + torus offset
+            // Header (4) + 10 spheres (80) + 10 boxes (120) + torus_index * 12 floats
+            baseOffset = 4 + 80 + 120 + obj.index * 12;
         }
         
         return {
@@ -283,6 +288,7 @@ fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f
     }
     
     // Set object position in sceneData
+    // ✅ FIXED: Correct offsets for 10 objects of each type
     setObjectPosition(obj, pos) {
         if (!obj) return;
         
@@ -290,9 +296,9 @@ fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f
         if (obj.type === 'sphere') {
             baseOffset = 4 + obj.index * 8;
         } else if (obj.type === 'box') {
-            baseOffset = 4 + 24 + obj.index * 12;
+            baseOffset = 4 + 80 + obj.index * 12;
         } else if (obj.type === 'torus') {
-            baseOffset = 4 + 24 + 24 + obj.index * 12;
+            baseOffset = 4 + 80 + 120 + obj.index * 12;
         }
         
         this.sceneData[baseOffset + 0] = pos.x;
@@ -336,16 +342,18 @@ fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f
     }
     
     // Handle drag
-    handleDrag(mouseX, mouseY, cameraPos, cameraDir, cameraDistance) {
+    handleDrag(deltaX, deltaY, cameraPos, cameraDir) {
         if (!this.selectedObject || !this.dragPlane) return;
         
-        // mouseX, mouseY are mouse delta values in screen pixels
+        // deltaX, deltaY are mouse delta values in screen pixels
         
         // Get current position
         const currentPos = this.getObjectPosition(this.selectedObject);
         
         // Calculate camera right and up vectors for world-space movement
         const up = { x: 0, y: 1, z: 0 };
+        
+        // Right vector: perpendicular to camera direction in XZ plane
         const right = {
             x: cameraDir.z,
             y: 0,
@@ -354,27 +362,32 @@ fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f
         
         // Normalize right
         const rightLen = Math.sqrt(right.x * right.x + right.z * right.z);
-        right.x /= rightLen;
-        right.z /= rightLen;
+        if (rightLen > 0.001) {
+            right.x /= rightLen;
+            right.z /= rightLen;
+        }
+        
+        // Calculate camera distance from cameraPos
+        const cameraDistance = Math.sqrt(
+            cameraPos.x * cameraPos.x + 
+            cameraPos.y * cameraPos.y + 
+            cameraPos.z * cameraPos.z
+        );
         
         // Convert screen pixels to world units
         // Lower sensitivity for smoother control
         const sensitivity = 0.002;
-        const deltaX = mouseX * sensitivity * cameraDistance;
-        const deltaY = mouseY * sensitivity * cameraDistance;
+        const dx = deltaX * sensitivity * cameraDistance;
+        const dy = deltaY * sensitivity * cameraDistance;
         
         // Move object in world space
         const newPos = {
-            x: currentPos.x + right.x * deltaX - up.x * deltaY,
-            y: currentPos.y - up.y * deltaY,
-            z: currentPos.z + right.z * deltaX - up.z * deltaY
+            x: currentPos.x + right.x * dx,
+            y: currentPos.y - up.y * dy,
+            z: currentPos.z + right.z * dx
         };
         
         this.setObjectPosition(this.selectedObject, newPos);
-        
-        if (this.onObjectMoved) {
-            this.onObjectMoved(this.selectedObject, newPos);
-        }
         
         return newPos;
     }
