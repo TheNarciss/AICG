@@ -291,6 +291,13 @@
                                 <div>• Subtract: Creuse la scène</div>
                                 <div>• Intersect: Garde l'overlap</div>
                             </div>
+
+                            <div class="mt-3 p-2 bg-gray-800 rounded text-sm text-gray-200">
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" id="toggle-subtract-normal" class="w-4 h-4">
+                                    <span>Traiter les objets <strong>Subtract</strong> comme <em>Normal</em></span>
+                                </label>
+                            </div>
                         </div>
                         
                         <!-- DYNAMIC PANELS CONTAINER -->
@@ -376,6 +383,11 @@ struct Uniforms {
     cameraTargetY: f32,
     cameraTargetZ: f32,
     _cameraPadding2: f32,
+            // Selection and global override flags
+            selType: f32,
+            selIndex: f32,
+            selHighlight: f32,
+            globalSubtractAsNormal: f32,
 }
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 `;
@@ -536,13 +548,21 @@ fn get_scene(p: vec3<f32>) -> vec4<f32> {
         // Determine effective mode and smoothness
         var effective_mode = sphere.blend_mode;
         var effective_k = sphere.blend_amount;
-        
+
         // If object is "Normal" but there's active smooth from another object, use smooth
         if sphere.blend_mode < 0.5 && active_smooth > 0.01 {
             effective_mode = 1.0;  // Switch to smooth union
             effective_k = active_smooth;
         }
-        
+
+        // Selection / global override: treat Subtract as Normal while selected or if toggled
+        let is_selected = uniforms.selHighlight > 0.5 && abs(f32(i) - uniforms.selIndex) < 0.5 && abs(uniforms.selType - 0.0) < 0.5;
+        if (uniforms.globalSubtractAsNormal > 0.5 || is_selected) {
+            if (abs(effective_mode - 2.0) < 0.5) {
+                effective_mode = 0.0;
+            }
+        }
+
         result = csg_blend(result.x, result.yzw, d, sphere.color, effective_mode, effective_k);
     }
     
@@ -557,12 +577,19 @@ fn get_scene(p: vec3<f32>) -> vec4<f32> {
         
         var effective_mode = box.blend_mode;
         var effective_k = box.blend_amount;
-        
+
         if box.blend_mode < 0.5 && active_smooth > 0.01 {
             effective_mode = 1.0;
             effective_k = active_smooth;
         }
-        
+
+        let is_selected_box = uniforms.selHighlight > 0.5 && abs(f32(i) - uniforms.selIndex) < 0.5 && abs(uniforms.selType - 1.0) < 0.5;
+        if (uniforms.globalSubtractAsNormal > 0.5 || is_selected_box) {
+            if (abs(effective_mode - 2.0) < 0.5) {
+                effective_mode = 0.0;
+            }
+        }
+
         result = csg_blend(result.x, result.yzw, d, box.color, effective_mode, effective_k);
     }
     
@@ -577,12 +604,19 @@ fn get_scene(p: vec3<f32>) -> vec4<f32> {
         
         var effective_mode = torus.blend_mode;
         var effective_k = torus.blend_amount;
-        
+
         if torus.blend_mode < 0.5 && active_smooth > 0.01 {
             effective_mode = 1.0;
             effective_k = active_smooth;
         }
-        
+
+        let is_selected_torus = uniforms.selHighlight > 0.5 && abs(f32(i) - uniforms.selIndex) < 0.5 && abs(uniforms.selType - 2.0) < 0.5;
+        if (uniforms.globalSubtractAsNormal > 0.5 || is_selected_torus) {
+            if (abs(effective_mode - 2.0) < 0.5) {
+                effective_mode = 0.0;
+            }
+        }
+
         result = csg_blend(result.x, result.yzw, d, torus.color, effective_mode, effective_k);
     }
     
@@ -899,6 +933,15 @@ fn fs_main(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
             const deltaTime = (currentTime - lastFrameTime) / 1000;
             const elapsedTime = (currentTime - startTime) / 1000;
             
+            // Selection info: selected object renders as Normal while editing
+            let selType = -1.0, selIndex = -1.0, selHighlight = 0.0;
+            if (selectedObject) {
+                selType = selectedObject.type === 'sphere' ? 0.0 : (selectedObject.type === 'box' ? 1.0 : 2.0);
+                selIndex = selectedObject.index;
+                selHighlight = 1.0;
+            }
+            if (typeof window.globalSubtractAsNormal === 'undefined') window.globalSubtractAsNormal = 0.0;
+
             const uniformData = new Float32Array([
                 canvas.width, canvas.height,
                 elapsedTime,
@@ -906,7 +949,8 @@ fn fs_main(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
                 mouseX, mouseY, mouseDown, 0,
                 frameCount, 0, 0, 0,
                 cameraYaw, cameraPitch, cameraDistance, 0,
-                cameraTargetX, cameraTargetY, cameraTargetZ, 0
+                cameraTargetX, cameraTargetY, cameraTargetZ, 0,
+                selType, selIndex, selHighlight, window.globalSubtractAsNormal
             ]);
             device.queue.writeBuffer(uniformBuffer, 0, uniformData);
             
@@ -1333,6 +1377,15 @@ fn fs_main(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
             
             togglePanelBtn.addEventListener('click', togglePanel);
             floatingToggleBtn.addEventListener('click', togglePanel);
+
+            // Global toggle control: treat Subtract as Normal
+            const toggleSubtractNormalCheckbox = document.getElementById('toggle-subtract-normal');
+            window.globalSubtractAsNormal = 0.0;
+            if (toggleSubtractNormalCheckbox) {
+                toggleSubtractNormalCheckbox.addEventListener('change', (e) => {
+                    window.globalSubtractAsNormal = e.target.checked ? 1.0 : 0.0;
+                });
+            }
             
             // Mouse events for camera AND object picking
             let clickStartX = 0, clickStartY = 0;
