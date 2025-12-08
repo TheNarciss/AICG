@@ -63,6 +63,8 @@ struct Sphere {
     center: vec3<f32>,
     radius: f32,
     color: vec3<f32>,
+    blend_mode: f32,
+    blend_amount: f32,
     _padding: f32,
 }
 
@@ -72,6 +74,8 @@ struct Box {
     size: vec3<f32>,
     _padding2: f32,
     color: vec3<f32>,
+    blend_mode: f32,
+    blend_amount: f32,
     _padding3: f32,
 }
 
@@ -81,6 +85,8 @@ struct Torus {
     radii: vec2<f32>,
     _padding2: vec2<f32>,
     color: vec3<f32>,
+    blend_mode: f32,
+    blend_amount: f32,
     _padding3: f32,
 }
 
@@ -270,14 +276,14 @@ fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f
         
         let baseOffset;
         if (obj.type === 'sphere') {
-            // Header (4 floats) + sphere_index * 8 floats
-            baseOffset = 4 + obj.index * 8;
+            // Header (4 floats) + sphere_index * 12 floats (WGSL aligned: 48 bytes)
+            baseOffset = 4 + obj.index * 12;
         } else if (obj.type === 'box') {
-            // Header (4) + 10 spheres (80) + box_index * 12 floats
-            baseOffset = 4 + 80 + obj.index * 12;
+            // Header (4) + 10 spheres (120) + box_index * 16 floats (WGSL aligned: 64 bytes)
+            baseOffset = 4 + 120 + obj.index * 16;
         } else if (obj.type === 'torus') {
-            // Header (4) + 10 spheres (80) + 10 boxes (120) + torus_index * 12 floats
-            baseOffset = 4 + 80 + 120 + obj.index * 12;
+            // Header (4) + 10 spheres (120) + 10 boxes (160) + torus_index * 16 floats
+            baseOffset = 4 + 120 + 160 + obj.index * 16;
         }
         
         return {
@@ -288,17 +294,17 @@ fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f
     }
     
     // Set object position in sceneData
-    // ✅ FIXED: Correct offsets for 10 objects of each type
+    // ✅ FIXED: WGSL-aligned offsets (Sphere=12, Box=16, Torus=16 floats)
     setObjectPosition(obj, pos) {
         if (!obj) return;
         
         let baseOffset;
         if (obj.type === 'sphere') {
-            baseOffset = 4 + obj.index * 8;
+            baseOffset = 4 + obj.index * 12;  // 12 floats per sphere (48 bytes)
         } else if (obj.type === 'box') {
-            baseOffset = 4 + 80 + obj.index * 12;
+            baseOffset = 4 + 120 + obj.index * 16;  // 120 (spheres) + 16 per box (64 bytes)
         } else if (obj.type === 'torus') {
-            baseOffset = 4 + 80 + 120 + obj.index * 12;
+            baseOffset = 4 + 120 + 160 + obj.index * 16;  // 120 + 160 + 16 per torus
         }
         
         this.sceneData[baseOffset + 0] = pos.x;

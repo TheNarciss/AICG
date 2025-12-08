@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebGPU Scene Editor - Zero Init</title>
+    <title>WebGPU Scene Editor - CSG Fixed</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
@@ -96,6 +96,15 @@
             z-index: 1;
         }
         
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+        }
+        
         #editor-side {
             position: absolute;
             top: 20px;
@@ -138,15 +147,22 @@
         }
         
         #side-panel {
-            width: 288px;
-            min-width: 288px;
-            max-width: 288px;
-            flex: 0 0 288px;
+            width: 320px;
+            min-width: 320px;
+            max-width: 320px;
+            flex: 0 0 320px;
             background: #1d2021;
             overflow-y: auto;
             overflow-x: hidden;
             -webkit-overflow-scrolling: touch;
             border-left: 1px solid #3c3836;
+        }
+        
+        .csg-controls {
+            background: #2d2d2d;
+            border-radius: 4px;
+            padding: 8px;
+            margin-top: 8px;
         }
     </style>
 </head>
@@ -178,18 +194,15 @@
                         <path d="M2 17L12 22L22 17"/>
                         <path d="M2 12L12 17L22 12"/>
                     </svg>
-                    <span class="font-bold text-gray-200">WebGPU Scene Editor</span>
+                    <span class="font-bold text-gray-200">WebGPU Scene Editor - CSG</span>
                 </div>
                 
                 <div class="flex items-center gap-3">
-                    <select id="shader-selector" class="bg-[#3c3836] text-gray-200 px-3 py-1 rounded text-sm border border-gray-600">
-                        <option value="">-- Select Shader --</option>
-                    </select>
                     <button id="compile-btn" class="bg-green-700 hover:bg-green-600 text-white px-4 py-1 rounded text-sm font-semibold transition">
                         Compile
                     </button>
                     <button id="toggle-panel-btn" class="bg-blue-700 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm font-semibold transition" title="Toggle Scene Panel">
-                        🎨 Panel
+                        ✖️ Close
                     </button>
                 </div>
             </div>
@@ -200,7 +213,7 @@
                     <textarea id="code-editor"></textarea>
                 </div>
                 
-                <div id="side-panel" class="w-72 bg-[#1d2021] border-l border-gray-700 overflow-y-auto">
+                <div id="side-panel" class="bg-[#1d2021] border-l border-gray-700 overflow-y-auto">
                     
                     <div class="p-4 border-b border-gray-700">
                         <h3 class="font-bold text-gray-200 mb-3 flex items-center gap-2">
@@ -222,11 +235,7 @@
                     
                     <div class="p-4">
                         <h3 class="font-bold text-gray-200 mb-3 flex items-center gap-2">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-blue-400">
-                                <circle cx="12" cy="12" r="10"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                            🎨 Scene Editor
+                            🎨 Scene Editor (CSG)
                         </h3>
                         
                         <!-- OBJECT MANAGER -->
@@ -235,519 +244,58 @@
                             
                             <div class="flex gap-2 mb-3">
                                 <button id="add-sphere-btn" class="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-semibold transition-colors">
-                                    ➕ Add Sphere
+                                    ➕ Sphere
                                 </button>
                                 <button id="remove-sphere-btn" class="flex-1 px-3 py-2 bg-red-900 hover:bg-red-800 text-white text-sm rounded transition-colors">
-                                    ➖ Remove Sphere
+                                    ➖
                                 </button>
                             </div>
                             
                             <div class="flex gap-2 mb-3">
                                 <button id="add-box-btn" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-semibold transition-colors">
-                                    ➕ Add Box
+                                    ➕ Box
                                 </button>
                                 <button id="remove-box-btn" class="flex-1 px-3 py-2 bg-green-900 hover:bg-green-800 text-white text-sm rounded transition-colors">
-                                    ➖ Remove Box
+                                    ➖
                                 </button>
                             </div>
                             
                             <div class="flex gap-2">
                                 <button id="add-torus-btn" class="flex-1 px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded font-semibold transition-colors">
-                                    ➕ Add Torus
+                                    ➕ Torus
                                 </button>
                                 <button id="remove-torus-btn" class="flex-1 px-3 py-2 bg-cyan-900 hover:bg-cyan-800 text-white text-sm rounded transition-colors">
-                                    ➖ Remove Torus
+                                    ➖
                                 </button>
                             </div>
                             
                             <div class="mt-3 p-2 bg-gray-900 rounded text-xs text-gray-400">
                                 <div class="flex justify-between">
-                                    <span>Active Spheres:</span>
+                                    <span>Spheres:</span>
                                     <span id="sphere-count" class="font-mono text-red-400">0</span>
                                 </div>
                                 <div class="flex justify-between mt-1">
-                                    <span>Active Boxes:</span>
+                                    <span>Boxes:</span>
                                     <span id="box-count" class="font-mono text-green-400">0</span>
                                 </div>
                                 <div class="flex justify-between mt-1">
-                                    <span>Active Tori:</span>
+                                    <span>Tori:</span>
                                     <span id="torus-count" class="font-mono text-cyan-400">0</span>
                                 </div>
                             </div>
-                        </div>
-                        
-                        <!-- SPHERE PANELS (ALL HIDDEN BY DEFAULT) -->
-                        <div id="sphere-0-panel" class="space-y-3" style="display:none">
-                            <div class="text-sm font-semibold text-red-400">🔴 Sphere 1 (Red)</div>
                             
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position X</span>
-                                    <span id="sphere-0-x-value" class="font-mono text-yellow-400">0.00</span>
-                                </label>
-                                <input type="range" id="sphere-0-x" min="-3" max="3" step="0.01" value="0" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Y</span>
-                                    <span id="sphere-0-y-value" class="font-mono text-yellow-400">0.00</span>
-                                </label>
-                                <input type="range" id="sphere-0-y" min="-2" max="2" step="0.01" value="0" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Z</span>
-                                    <span id="sphere-0-z-value" class="font-mono text-yellow-400">0.00</span>
-                                </label>
-                                <input type="range" id="sphere-0-z" min="-3" max="3" step="0.01" value="0" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Radius</span>
-                                    <span id="sphere-0-radius-value" class="font-mono text-yellow-400">0.50</span>
-                                </label>
-                                <input type="range" id="sphere-0-radius" min="0.1" max="2.0" step="0.01" value="0.5" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs block mb-1 text-gray-400">Color</label>
-                                <input type="color" id="sphere-0-color" value="#ff4d4d" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600">
+                            <div class="mt-3 p-2 bg-purple-900/30 rounded text-xs text-purple-300">
+                                <div class="font-semibold mb-1">💡 CSG Modes:</div>
+                                <div>• Normal: No blending</div>
+                                <div>• Union: Smooth merge</div>
+                                <div>• Subtract: Cut from scene</div>
+                                <div>• Intersect: Keep overlap</div>
                             </div>
                         </div>
                         
-                        <div id="sphere-1-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-blue-400">🔵 Sphere 2 (Blue)</div>
-                            
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position X</span>
-                                    <span id="sphere-1-x-value" class="font-mono text-yellow-400">-1.50</span>
-                                </label>
-                                <input type="range" id="sphere-1-x" min="-3" max="3" step="0.01" value="-1.5" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Y</span>
-                                    <span id="sphere-1-y-value" class="font-mono text-yellow-400">0.30</span>
-                                </label>
-                                <input type="range" id="sphere-1-y" min="-2" max="2" step="0.01" value="0.3" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Z</span>
-                                    <span id="sphere-1-z-value" class="font-mono text-yellow-400">0.00</span>
-                                </label>
-                                <input type="range" id="sphere-1-z" min="-3" max="3" step="0.01" value="0" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Radius</span>
-                                    <span id="sphere-1-radius-value" class="font-mono text-yellow-400">0.40</span>
-                                </label>
-                                <input type="range" id="sphere-1-radius" min="0.1" max="2.0" step="0.01" value="0.4" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs block mb-1 text-gray-400">Color</label>
-                                <input type="color" id="sphere-1-color" value="#4d7fff" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600">
-                            </div>
-                        </div>
-                        
-                        <div id="sphere-2-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-yellow-400">🟡 Sphere 3 (Yellow)</div>
-                            
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position X</span>
-                                    <span id="sphere-2-x-value" class="font-mono text-yellow-400">0.00</span>
-                                </label>
-                                <input type="range" id="sphere-2-x" min="-3" max="3" step="0.01" value="0" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Y</span>
-                                    <span id="sphere-2-y-value" class="font-mono text-yellow-400">0.50</span>
-                                </label>
-                                <input type="range" id="sphere-2-y" min="-2" max="2" step="0.01" value="0.5" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Z</span>
-                                    <span id="sphere-2-z-value" class="font-mono text-yellow-400">-1.50</span>
-                                </label>
-                                <input type="range" id="sphere-2-z" min="-3" max="3" step="0.01" value="-1.5" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Radius</span>
-                                    <span id="sphere-2-radius-value" class="font-mono text-yellow-400">0.35</span>
-                                </label>
-                                <input type="range" id="sphere-2-radius" min="0.1" max="2.0" step="0.01" value="0.35" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs block mb-1 text-gray-400">Color</label>
-                                <input type="color" id="sphere-2-color" value="#ffff4d" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600">
-                            </div>
-                        </div>
-                        
-                        <!-- SPHERE 4-10 (hidden by default) -->
-                        <div id="sphere-3-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-purple-400">🟣 Sphere 4</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="sphere-3-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-3-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="sphere-3-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-3-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="sphere-3-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-3-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Radius</span><span id="sphere-3-radius-value" class="font-mono text-yellow-400">0.40</span></label><input type="range" id="sphere-3-radius" min="0.1" max="2.0" step="0.01" value="0.4" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="sphere-3-color" value="#a78bfa" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="sphere-4-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-pink-400">🩷 Sphere 5</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="sphere-4-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-4-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="sphere-4-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-4-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="sphere-4-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-4-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Radius</span><span id="sphere-4-radius-value" class="font-mono text-yellow-400">0.40</span></label><input type="range" id="sphere-4-radius" min="0.1" max="2.0" step="0.01" value="0.4" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="sphere-4-color" value="#ec4899" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="sphere-5-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-cyan-400">🔷 Sphere 6</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="sphere-5-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-5-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="sphere-5-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-5-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="sphere-5-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-5-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Radius</span><span id="sphere-5-radius-value" class="font-mono text-yellow-400">0.40</span></label><input type="range" id="sphere-5-radius" min="0.1" max="2.0" step="0.01" value="0.4" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="sphere-5-color" value="#06b6d4" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="sphere-6-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-teal-400">🟪 Sphere 7</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="sphere-6-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-6-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="sphere-6-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-6-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="sphere-6-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-6-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Radius</span><span id="sphere-6-radius-value" class="font-mono text-yellow-400">0.40</span></label><input type="range" id="sphere-6-radius" min="0.1" max="2.0" step="0.01" value="0.4" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="sphere-6-color" value="#14b8a6" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="sphere-7-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-indigo-400">🔹 Sphere 8</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="sphere-7-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-7-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="sphere-7-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-7-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="sphere-7-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-7-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Radius</span><span id="sphere-7-radius-value" class="font-mono text-yellow-400">0.40</span></label><input type="range" id="sphere-7-radius" min="0.1" max="2.0" step="0.01" value="0.4" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="sphere-7-color" value="#6366f1" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="sphere-8-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-violet-400">🟨 Sphere 9</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="sphere-8-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-8-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="sphere-8-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-8-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="sphere-8-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-8-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Radius</span><span id="sphere-8-radius-value" class="font-mono text-yellow-400">0.40</span></label><input type="range" id="sphere-8-radius" min="0.1" max="2.0" step="0.01" value="0.4" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="sphere-8-color" value="#a855f7" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="sphere-9-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-rose-400">🟥 Sphere 10</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="sphere-9-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-9-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="sphere-9-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-9-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="sphere-9-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="sphere-9-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Radius</span><span id="sphere-9-radius-value" class="font-mono text-yellow-400">0.40</span></label><input type="range" id="sphere-9-radius" min="0.1" max="2.0" step="0.01" value="0.4" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="sphere-9-color" value="#f43f5e" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        
-                        <!-- BOX PANELS (ALL HIDDEN BY DEFAULT) -->
-                        <div id="box-0-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-green-400">🟩 Box 1 (Green)</div>
-                            
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position X</span>
-                                    <span id="box-0-x-value" class="font-mono text-yellow-400">1.50</span>
-                                </label>
-                                <input type="range" id="box-0-x" min="-3" max="3" step="0.01" value="1.5" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Y</span>
-                                    <span id="box-0-y-value" class="font-mono text-yellow-400">0.00</span>
-                                </label>
-                                <input type="range" id="box-0-y" min="-2" max="2" step="0.01" value="0" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Z</span>
-                                    <span id="box-0-z-value" class="font-mono text-yellow-400">0.00</span>
-                                </label>
-                                <input type="range" id="box-0-z" min="-3" max="3" step="0.01" value="0" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Size</span>
-                                    <span id="box-0-size-value" class="font-mono text-yellow-400">0.40</span>
-                                </label>
-                                <input type="range" id="box-0-size" min="0.1" max="1.5" step="0.01" value="0.4" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs block mb-1 text-gray-400">Color</label>
-                                <input type="color" id="box-0-color" value="#4dff4d" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600">
-                            </div>
-                        </div>
-                        
-                        <div id="box-1-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-purple-400">🟪 Box 2 (Magenta)</div>
-                            
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position X</span>
-                                    <span id="box-1-x-value" class="font-mono text-yellow-400">0.00</span>
-                                </label>
-                                <input type="range" id="box-1-x" min="-3" max="3" step="0.01" value="0" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Y</span>
-                                    <span id="box-1-y-value" class="font-mono text-yellow-400">-0.20</span>
-                                </label>
-                                <input type="range" id="box-1-y" min="-2" max="2" step="0.01" value="-0.2" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Z</span>
-                                    <span id="box-1-z-value" class="font-mono text-yellow-400">1.00</span>
-                                </label>
-                                <input type="range" id="box-1-z" min="-3" max="3" step="0.01" value="1.0" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Size</span>
-                                    <span id="box-1-size-value" class="font-mono text-yellow-400">0.30</span>
-                                </label>
-                                <input type="range" id="box-1-size" min="0.1" max="1.5" step="0.01" value="0.3" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs block mb-1 text-gray-400">Color</label>
-                                <input type="color" id="box-1-color" value="#ff4dff" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600">
-                            </div>
-                        </div>
-                        
-                        <!-- BOX 3-10 (hidden by default) -->
-                        <div id="box-2-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-blue-400">🟦 Box 3</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="box-2-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-2-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="box-2-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-2-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="box-2-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-2-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Size</span><span id="box-2-size-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="box-2-size" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="box-2-color" value="#3b82f6" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="box-3-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-indigo-400">🟦 Box 4</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="box-3-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-3-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="box-3-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-3-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="box-3-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-3-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Size</span><span id="box-3-size-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="box-3-size" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="box-3-color" value="#6366f1" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="box-4-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-purple-400">🟦 Box 5</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="box-4-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-4-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="box-4-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-4-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="box-4-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-4-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Size</span><span id="box-4-size-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="box-4-size" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="box-4-color" value="#a855f7" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="box-5-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-pink-400">🟦 Box 6</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="box-5-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-5-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="box-5-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-5-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="box-5-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-5-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Size</span><span id="box-5-size-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="box-5-size" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="box-5-color" value="#ec4899" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="box-6-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-rose-400">🟦 Box 7</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="box-6-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-6-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="box-6-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-6-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="box-6-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-6-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Size</span><span id="box-6-size-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="box-6-size" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="box-6-color" value="#f43f5e" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="box-7-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-orange-400">🟦 Box 8</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="box-7-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-7-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="box-7-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-7-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="box-7-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-7-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Size</span><span id="box-7-size-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="box-7-size" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="box-7-color" value="#f97316" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="box-8-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-amber-400">🟦 Box 9</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="box-8-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-8-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="box-8-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-8-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="box-8-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-8-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Size</span><span id="box-8-size-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="box-8-size" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="box-8-color" value="#eab308" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="box-9-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-lime-400">🟦 Box 10</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="box-9-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-9-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="box-9-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-9-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="box-9-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="box-9-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Size</span><span id="box-9-size-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="box-9-size" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="box-9-color" value="#84cc16" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        
-                        <!-- TORUS PANELS (ALL HIDDEN BY DEFAULT) -->
-                        <div id="torus-0-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-cyan-400">🍩 Torus 1 (Cyan)</div>
-                            
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position X</span>
-                                    <span id="torus-0-x-value" class="font-mono text-yellow-400">-1.50</span>
-                                </label>
-                                <input type="range" id="torus-0-x" min="-3" max="3" step="0.01" value="-1.5" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Y</span>
-                                    <span id="torus-0-y-value" class="font-mono text-yellow-400">0.50</span>
-                                </label>
-                                <input type="range" id="torus-0-y" min="-2" max="2" step="0.01" value="0.5" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Z</span>
-                                    <span id="torus-0-z-value" class="font-mono text-yellow-400">1.00</span>
-                                </label>
-                                <input type="range" id="torus-0-z" min="-3" max="3" step="0.01" value="1.0" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Major Radius</span>
-                                    <span id="torus-0-major-value" class="font-mono text-yellow-400">0.40</span>
-                                </label>
-                                <input type="range" id="torus-0-major" min="0.1" max="1.0" step="0.01" value="0.4" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Minor Radius</span>
-                                    <span id="torus-0-minor-value" class="font-mono text-yellow-400">0.15</span>
-                                </label>
-                                <input type="range" id="torus-0-minor" min="0.05" max="0.5" step="0.01" value="0.15" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs block mb-1 text-gray-400">Color</label>
-                                <input type="color" id="torus-0-color" value="#4dffff" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600">
-                            </div>
-                        </div>
-                        
-                        <div id="torus-1-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-orange-400">🍩 Torus 2 (Orange)</div>
-                            
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position X</span>
-                                    <span id="torus-1-x-value" class="font-mono text-yellow-400">1.50</span>
-                                </label>
-                                <input type="range" id="torus-1-x" min="-3" max="3" step="0.01" value="1.5" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Y</span>
-                                    <span id="torus-1-y-value" class="font-mono text-yellow-400">0.30</span>
-                                </label>
-                                <input type="range" id="torus-1-y" min="-2" max="2" step="0.01" value="0.3" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Position Z</span>
-                                    <span id="torus-1-z-value" class="font-mono text-yellow-400">-1.00</span>
-                                </label>
-                                <input type="range" id="torus-1-z" min="-3" max="3" step="0.01" value="-1.0" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Major Radius</span>
-                                    <span id="torus-1-major-value" class="font-mono text-yellow-400">0.35</span>
-                                </label>
-                                <input type="range" id="torus-1-major" min="0.1" max="1.0" step="0.01" value="0.35" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs flex justify-between mb-1">
-                                    <span class="text-gray-400">Minor Radius</span>
-                                    <span id="torus-1-minor-value" class="font-mono text-yellow-400">0.12</span>
-                                </label>
-                                <input type="range" id="torus-1-minor" min="0.05" max="0.5" step="0.01" value="0.12" class="w-full">
-                            </div>
-                            <div>
-                                <label class="text-xs block mb-1 text-gray-400">Color</label>
-                                <input type="color" id="torus-1-color" value="#ff9933" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600">
-                            </div>
-                        </div>
-                        
-                        <!-- TORUS 3-10 (hidden by default) -->
-                        <div id="torus-2-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-red-400">🍩 Torus 3</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="torus-2-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-2-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="torus-2-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-2-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="torus-2-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-2-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Major Radius</span><span id="torus-2-major-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="torus-2-major" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Minor Radius</span><span id="torus-2-minor-value" class="font-mono text-yellow-400">0.10</span></label><input type="range" id="torus-2-minor" min="0.05" max="0.5" step="0.01" value="0.1" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="torus-2-color" value="#ef4444" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="torus-3-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-red-400">🍩 Torus 4</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="torus-3-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-3-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="torus-3-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-3-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="torus-3-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-3-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Major Radius</span><span id="torus-3-major-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="torus-3-major" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Minor Radius</span><span id="torus-3-minor-value" class="font-mono text-yellow-400">0.10</span></label><input type="range" id="torus-3-minor" min="0.05" max="0.5" step="0.01" value="0.1" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="torus-3-color" value="#f87171" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="torus-4-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-orange-400">🍩 Torus 5</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="torus-4-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-4-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="torus-4-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-4-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="torus-4-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-4-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Major Radius</span><span id="torus-4-major-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="torus-4-major" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Minor Radius</span><span id="torus-4-minor-value" class="font-mono text-yellow-400">0.10</span></label><input type="range" id="torus-4-minor" min="0.05" max="0.5" step="0.01" value="0.1" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="torus-4-color" value="#fb923c" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="torus-5-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-yellow-400">🍩 Torus 6</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="torus-5-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-5-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="torus-5-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-5-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="torus-5-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-5-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Major Radius</span><span id="torus-5-major-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="torus-5-major" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Minor Radius</span><span id="torus-5-minor-value" class="font-mono text-yellow-400">0.10</span></label><input type="range" id="torus-5-minor" min="0.05" max="0.5" step="0.01" value="0.1" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="torus-5-color" value="#fbbf24" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="torus-6-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-green-400">🍩 Torus 7</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="torus-6-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-6-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="torus-6-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-6-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="torus-6-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-6-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Major Radius</span><span id="torus-6-major-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="torus-6-major" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Minor Radius</span><span id="torus-6-minor-value" class="font-mono text-yellow-400">0.10</span></label><input type="range" id="torus-6-minor" min="0.05" max="0.5" step="0.01" value="0.1" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="torus-6-color" value="#4ade80" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="torus-7-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-cyan-400">🍩 Torus 8</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="torus-7-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-7-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="torus-7-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-7-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="torus-7-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-7-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Major Radius</span><span id="torus-7-major-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="torus-7-major" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Minor Radius</span><span id="torus-7-minor-value" class="font-mono text-yellow-400">0.10</span></label><input type="range" id="torus-7-minor" min="0.05" max="0.5" step="0.01" value="0.1" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="torus-7-color" value="#22d3ee" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="torus-8-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-blue-400">🍩 Torus 9</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="torus-8-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-8-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="torus-8-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-8-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="torus-8-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-8-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Major Radius</span><span id="torus-8-major-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="torus-8-major" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Minor Radius</span><span id="torus-8-minor-value" class="font-mono text-yellow-400">0.10</span></label><input type="range" id="torus-8-minor" min="0.05" max="0.5" step="0.01" value="0.1" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="torus-8-color" value="#0ea5e9" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
-                        </div>
-                        <div id="torus-9-panel" class="space-y-3 mt-6 pt-6 border-t border-gray-700" style="display:none">
-                            <div class="text-sm font-semibold text-indigo-400">🍩 Torus 10</div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position X</span><span id="torus-9-x-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-9-x" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Y</span><span id="torus-9-y-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-9-y" min="-2" max="2" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Position Z</span><span id="torus-9-z-value" class="font-mono text-yellow-400">0.00</span></label><input type="range" id="torus-9-z" min="-3" max="3" step="0.01" value="0" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Major Radius</span><span id="torus-9-major-value" class="font-mono text-yellow-400">0.30</span></label><input type="range" id="torus-9-major" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full"></div>
-                            <div><label class="text-xs flex justify-between mb-1"><span class="text-gray-400">Minor Radius</span><span id="torus-9-minor-value" class="font-mono text-yellow-400">0.10</span></label><input type="range" id="torus-9-minor" min="0.05" max="0.5" step="0.01" value="0.1" class="w-full"></div>
-                            <div><label class="text-xs block mb-1 text-gray-400">Color</label><input type="color" id="torus-9-color" value="#6366f1" class="w-full h-10 rounded cursor-pointer border-2 border-gray-600"></div>
+                        <!-- DYNAMIC PANELS CONTAINER -->
+                        <div id="object-panels-container">
+                            <!-- Panels will be generated dynamically -->
                         </div>
                         
                     </div>
@@ -755,9 +303,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Object Picker Module -->
-    <script src="object_picker.js"></script>
 
     <script>
         // ================================================
@@ -778,7 +323,7 @@
         // Camera controls
         let cameraYaw = 0.0;
         let cameraPitch = 0.5;
-        let cameraDistance = 4.0;
+        let cameraDistance = 5.0;
         let cameraTargetX = 0.0;
         let cameraTargetY = 0.0;
         let cameraTargetZ = 0.0;
@@ -786,12 +331,16 @@
         let isDragging = false;
         let lastMouseX = 0;
         let lastMouseY = 0;
-        let isShiftPressed = false;
         
-        // Object picker
-        let objectPicker = null;
-        let isPickingMode = false;
-        let selectedObject = null;
+        // Object counts
+        let activeSpheres = 0;
+        let activeBoxes = 0;
+        let activeTori = 0;
+        
+        // Object picking
+        let selectedObject = null; // { type: 'sphere', index: 0 }
+        let isDraggingObject = false;
+        let dragStartPos = null;
         
         // ================================================
         // WGSL SHADERS
@@ -836,7 +385,11 @@ struct Sphere {
     center: vec3<f32>,
     radius: f32,
     color: vec3<f32>,
-    _padding: f32,
+    blend_mode: f32,
+    blend_amount: f32,
+    _padding1: f32,
+    _padding2: f32,
+    _padding3: f32,
 }
 
 struct Box {
@@ -845,7 +398,11 @@ struct Box {
     size: vec3<f32>,
     _padding2: f32,
     color: vec3<f32>,
+    blend_mode: f32,
+    blend_amount: f32,
     _padding3: f32,
+    _padding4: f32,
+    _padding5: f32,
 }
 
 struct Torus {
@@ -854,7 +411,11 @@ struct Torus {
     radii: vec2<f32>,
     _padding2: vec2<f32>,
     color: vec3<f32>,
+    blend_mode: f32,
+    blend_amount: f32,
     _padding3: f32,
+    _padding4: f32,
+    _padding5: f32,
 }
 
 struct Scene {
@@ -869,187 +430,235 @@ struct Scene {
 @group(0) @binding(1) var<uniform> scene: Scene;
 `;
 
-        const fallbackShader = `
-@fragment
-fn fs_main(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
-  let uv = (fragCoord.xy - uniforms.resolution * 0.5) / min(uniforms.resolution.x, uniforms.resolution.y);
+        const mainShader = `
+// ===== CONSTANTS =====
+const MAX_DIST: f32 = 100.0;
+const SURF_DIST: f32 = 0.001;
+const MAX_STEPS: i32 = 256;
 
-  // Camera from uniforms
-  let yaw = uniforms.cameraYaw;
-  let pitch = uniforms.cameraPitch;
-  let cam_dist = uniforms.cameraDistance;
-  
-  let cam_target = vec3<f32>(
-    uniforms.cameraTargetX,
-    uniforms.cameraTargetY,
-    uniforms.cameraTargetZ
-  );
-  
-  let cam_pos = vec3<f32>(
-    sin(yaw) * cos(pitch),
-    sin(pitch),
-    cos(yaw) * cos(pitch)
-  ) * cam_dist + cam_target;
-
-  // Camera Matrix
-  let cam_forward = normalize(cam_target - cam_pos);
-  let cam_right = normalize(cross(cam_forward, vec3<f32>(0.0, 1.0, 0.0)));
-  let cam_up = cross(cam_right, cam_forward);
-
-  // Ray Direction
-  let focal_length = 1.5;
-  let rd = normalize(cam_right * uv.x - cam_up * uv.y + cam_forward * focal_length);
-
-  // Ray march
-  let result = ray_march(cam_pos, rd);
-
-  if result.x < 100.0 {
-    // Hit something - calculate lighting
-    let hit_pos = cam_pos + rd * result.x;
-    let normal = get_normal(hit_pos);
-
-    // Diffuse Lighting
-    let light_pos = vec3<f32>(2.0, 5.0, -1.0);
-    let light_dir = normalize(light_pos - hit_pos);
-    let diffuse = max(dot(normal, light_dir), 0.0);
-
-    // Shadow Casting
-    let shadow_origin = hit_pos + normal * 0.01;
-    let shadow_result = ray_march(shadow_origin, light_dir);
-    let shadow = select(0.3, 1.0, shadow_result.x > length(light_pos - shadow_origin));
-
-    // Phong Shading
-    let ambient = 0.2;
-    var albedo = get_material_color(result.y, hit_pos);
-    let phong = albedo * (ambient + diffuse * shadow * 0.8);
-
-    // Exponential Fog
-    let fog = exp(-result.x * 0.02);
-    let color = mix(vec3<f32>(0.7, 0.8, 0.9), phong, fog);
-
-    return vec4<f32>(pow(color, vec3<f32>(1.0 / 2.2)), 1.0);
-  }
-
-  // Sky gradient
-  let sky = mix(vec3<f32>(0.7, 0.8, 0.9), vec3<f32>(0.7, 0.8, 0.9) * 0.9, uv.y * 0.5 + 0.5);
-  return vec4<f32>(pow(sky, vec3<f32>(1.0 / 2.2)), 1.0);
-}
-
-fn get_material_color(mat_id: f32, p: vec3<f32>) -> vec3<f32> {
-  if mat_id < 0.0 {
-    return vec3<f32>(0.5, 0.5, 0.5);
-  }
-  
-  if mat_id == 0.0 {
-    let checker = floor(p.x) + floor(p.z);
-    let col1 = vec3<f32>(0.9, 0.9, 0.9);
-    let col2 = vec3<f32>(0.2, 0.2, 0.2);
-    return select(col2, col1, i32(checker) % 2 == 0);
-  }
-  
-  // For spheres, boxes, tori - use their actual colors from buffer
-  let sphere_id = floor((mat_id - 1.0) * 10.0 + 0.5);
-  let box_id = floor((mat_id - 2.0) * 10.0 + 0.5);
-  let torus_id = floor((mat_id - 3.0) * 10.0 + 0.5);
-  
-  if mat_id >= 1.0 && mat_id < 2.0 && sphere_id < f32(scene.num_spheres) {
-    return scene.spheres[u32(sphere_id)].color;
-  }
-  
-  if mat_id >= 2.0 && mat_id < 3.0 && box_id < f32(scene.num_boxes) {
-    return scene.boxes[u32(box_id)].color;
-  }
-  
-  if mat_id >= 3.0 && mat_id < 4.0 && torus_id < f32(scene.num_tori) {
-    return scene.tori[u32(torus_id)].color;
-  }
-  
-  return vec3<f32>(1.0, 0.0, 1.0);
-}
-
+// ===== SDF PRIMITIVES =====
 fn sd_sphere(p: vec3<f32>, r: f32) -> f32 {
-  return length(p) - r;
+    return length(p) - r;
 }
 
 fn sd_box(p: vec3<f32>, b: vec3<f32>) -> f32 {
-  let q = abs(p) - b;
-  return length(max(q, vec3<f32>(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
+    let q = abs(p) - b;
+    return length(max(q, vec3<f32>(0.0))) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
 fn sd_torus(p: vec3<f32>, t: vec2<f32>) -> f32 {
-  let q = vec2<f32>(length(p.xz) - t.x, p.y);
-  return length(q) - t.y;
+    let q = vec2<f32>(length(p.xz) - t.x, p.y);
+    return length(q) - t.y;
 }
 
 fn sd_plane(p: vec3<f32>, n: vec3<f32>, h: f32) -> f32 {
-  return dot(p, n) + h;
+    return dot(p, n) + h;
 }
 
-fn get_dist(p: vec3<f32>) -> vec2<f32> {
-  var res = vec2<f32>(100.0, -1.0);
-
-  // Ground plane
-  let plane_dist = sd_plane(p, vec3<f32>(0.0, 1.0, 0.0), 0.5);
-  if plane_dist < res.x {
-    res = vec2<f32>(plane_dist, 0.0);
-  }
-
-  // Dynamic spheres from buffer - only iterate over active spheres
-  for (var i = 0u; i < scene.num_spheres && i < 10u; i++) {
-    let sphere = scene.spheres[i];
-    let sphere_dist = sd_sphere(p - sphere.center, sphere.radius);
-    if sphere_dist < res.x {
-      res = vec2<f32>(sphere_dist, 1.0 + f32(i) * 0.1);
-    }
-  }
-
-  // Dynamic boxes from buffer - only iterate over active boxes
-  for (var i = 0u; i < scene.num_boxes && i < 10u; i++) {
-    let box = scene.boxes[i];
-    let box_dist = sd_box(p - box.center, box.size);
-    if box_dist < res.x {
-      res = vec2<f32>(box_dist, 2.0 + f32(i) * 0.1);
-    }
-  }
-
-  // Dynamic tori from buffer - only iterate over active tori
-  for (var i = 0u; i < scene.num_tori && i < 10u; i++) {
-    let torus = scene.tori[i];
-    let torus_dist = sd_torus(p - torus.center, torus.radii);
-    if torus_dist < res.x {
-      res = vec2<f32>(torus_dist, 3.0 + f32(i) * 0.1);
-    }
-  }
-
-  return res;
+// ===== CSG OPERATIONS =====
+fn smin(a: f32, b: f32, k: f32) -> f32 {
+    let h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    return mix(b, a, h) - k * h * (1.0 - h);
 }
 
-fn ray_march(ro: vec3<f32>, rd: vec3<f32>) -> vec2<f32> {
-  var d = 0.0;
-  var mat_id = -1.0;
-
-  for (var i = 0; i < 256; i++) {
-    let p = ro + rd * d;
-    let dist_mat = get_dist(p);
-    d += dist_mat.x;
-    mat_id = dist_mat.y;
-
-    if dist_mat.x < 0.001 || d > 100.0 {
-      break;
-    }
-  }
-
-  return vec2<f32>(d, mat_id);
+fn smax(a: f32, b: f32, k: f32) -> f32 {
+    return -smin(-a, -b, k);
 }
 
+// CSG blend with color mixing
+// Returns vec4(distance, color.rgb)
+fn csg_blend(d1: f32, c1: vec3<f32>, d2: f32, c2: vec3<f32>, mode: f32, k: f32) -> vec4<f32> {
+    let m = i32(mode + 0.5);
+    
+    if m == 0 {
+        // Normal - simple min, keep closer color
+        if d2 < d1 {
+            return vec4<f32>(d2, c2);
+        }
+        return vec4<f32>(d1, c1);
+    } else if m == 1 {
+        // Smooth Union - blend colors based on distance
+        let h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);
+        let d = mix(d2, d1, h) - k * h * (1.0 - h);
+        let c = mix(c2, c1, h);
+        return vec4<f32>(d, c);
+    } else if m == 2 {
+        // Subtract (d1 - d2) - keep d1's color
+        let d = smax(d1, -d2, k);
+        return vec4<f32>(d, c1);
+    } else if m == 3 {
+        // Intersect - keep closer color
+        let d = max(d1, d2);
+        if d1 > d2 {
+            return vec4<f32>(d, c1);
+        }
+        return vec4<f32>(d, c2);
+    } else if m == 4 {
+        // XOR
+        let d = max(min(d1, d2), -max(d1, d2));
+        if d1 < d2 {
+            return vec4<f32>(d, c1);
+        }
+        return vec4<f32>(d, c2);
+    }
+    
+    // Default
+    if d2 < d1 {
+        return vec4<f32>(d2, c2);
+    }
+    return vec4<f32>(d1, c1);
+}
+
+// ===== SCENE EVALUATION =====
+// Returns vec4(distance, color.rgb)
+fn get_scene(p: vec3<f32>) -> vec4<f32> {
+    // Start with ground plane
+    let plane_dist = sd_plane(p, vec3<f32>(0.0, 1.0, 0.0), 0.5);
+    let checker = floor(p.x) + floor(p.z);
+    let plane_color = select(vec3<f32>(0.2, 0.2, 0.2), vec3<f32>(0.9, 0.9, 0.9), i32(checker) % 2 == 0);
+    
+    var result = vec4<f32>(plane_dist, plane_color);
+    
+    // Process spheres
+    for (var i = 0u; i < scene.num_spheres && i < 10u; i++) {
+        let sphere = scene.spheres[i];
+        let d = sd_sphere(p - sphere.center, sphere.radius);
+        result = csg_blend(result.x, result.yzw, d, sphere.color, sphere.blend_mode, sphere.blend_amount);
+    }
+    
+    // Process boxes
+    for (var i = 0u; i < scene.num_boxes && i < 10u; i++) {
+        let box = scene.boxes[i];
+        let d = sd_box(p - box.center, box.size);
+        result = csg_blend(result.x, result.yzw, d, box.color, box.blend_mode, box.blend_amount);
+    }
+    
+    // Process tori
+    for (var i = 0u; i < scene.num_tori && i < 10u; i++) {
+        let torus = scene.tori[i];
+        let d = sd_torus(p - torus.center, torus.radii);
+        result = csg_blend(result.x, result.yzw, d, torus.color, torus.blend_mode, torus.blend_amount);
+    }
+    
+    return result;
+}
+
+// Simple distance query for normals
+fn get_dist(p: vec3<f32>) -> f32 {
+    return get_scene(p).x;
+}
+
+// ===== RAY MARCHING =====
+struct HitResult {
+    dist: f32,
+    color: vec3<f32>,
+    hit: bool,
+}
+
+fn ray_march(ro: vec3<f32>, rd: vec3<f32>) -> HitResult {
+    var d = 0.0;
+    var result: HitResult;
+    result.hit = false;
+    result.color = vec3<f32>(0.7, 0.8, 0.9); // Sky color
+    
+    for (var i = 0; i < MAX_STEPS; i++) {
+        let p = ro + rd * d;
+        let scene_result = get_scene(p);
+        let step_dist = scene_result.x;
+        
+        if step_dist < SURF_DIST {
+            result.dist = d;
+            result.color = scene_result.yzw;
+            result.hit = true;
+            break;
+        }
+        
+        d += step_dist;
+        
+        if d > MAX_DIST {
+            break;
+        }
+    }
+    
+    result.dist = d;
+    return result;
+}
+
+// ===== NORMALS =====
 fn get_normal(p: vec3<f32>) -> vec3<f32> {
-  let e = vec2<f32>(0.001, 0.0);
-  let n = vec3<f32>(
-    get_dist(p + e.xyy).x - get_dist(p - e.xyy).x,
-    get_dist(p + e.yxy).x - get_dist(p - e.yxy).x,
-    get_dist(p + e.yyx).x - get_dist(p - e.yyx).x
-  );
-  return normalize(n);
+    let e = vec2<f32>(0.001, 0.0);
+    let n = vec3<f32>(
+        get_dist(p + e.xyy) - get_dist(p - e.xyy),
+        get_dist(p + e.yxy) - get_dist(p - e.yxy),
+        get_dist(p + e.yyx) - get_dist(p - e.yyx)
+    );
+    return normalize(n);
+}
+
+// ===== MAIN FRAGMENT SHADER =====
+@fragment
+fn fs_main(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
+    let uv = (fragCoord.xy - uniforms.resolution * 0.5) / min(uniforms.resolution.x, uniforms.resolution.y);
+    
+    // Camera setup
+    let yaw = uniforms.cameraYaw;
+    let pitch = uniforms.cameraPitch;
+    let cam_dist = uniforms.cameraDistance;
+    
+    let cam_target = vec3<f32>(
+        uniforms.cameraTargetX,
+        uniforms.cameraTargetY,
+        uniforms.cameraTargetZ
+    );
+    
+    let cam_pos = vec3<f32>(
+        sin(yaw) * cos(pitch),
+        sin(pitch),
+        cos(yaw) * cos(pitch)
+    ) * cam_dist + cam_target;
+    
+    // Camera matrix
+    let cam_forward = normalize(cam_target - cam_pos);
+    let cam_right = normalize(cross(cam_forward, vec3<f32>(0.0, 1.0, 0.0)));
+    let cam_up = cross(cam_right, cam_forward);
+    
+    // Ray direction
+    let focal_length = 1.5;
+    let rd = normalize(cam_right * uv.x - cam_up * uv.y + cam_forward * focal_length);
+    
+    // Ray march
+    let hit = ray_march(cam_pos, rd);
+    
+    if hit.hit {
+        let hit_pos = cam_pos + rd * hit.dist;
+        let normal = get_normal(hit_pos);
+        
+        // Lighting
+        let light_pos = vec3<f32>(3.0, 5.0, -2.0);
+        let light_dir = normalize(light_pos - hit_pos);
+        let diffuse = max(dot(normal, light_dir), 0.0);
+        
+        // Shadow
+        let shadow_origin = hit_pos + normal * 0.02;
+        let shadow_hit = ray_march(shadow_origin, light_dir);
+        let in_shadow = shadow_hit.hit && shadow_hit.dist < length(light_pos - shadow_origin);
+        let shadow = select(1.0, 0.3, in_shadow);
+        
+        // Ambient + Diffuse
+        let ambient = 0.15;
+        let color = hit.color * (ambient + diffuse * shadow * 0.85);
+        
+        // Fog
+        let fog = exp(-hit.dist * 0.03);
+        let sky_color = vec3<f32>(0.7, 0.8, 0.9);
+        let final_color = mix(sky_color, color, fog);
+        
+        return vec4<f32>(pow(final_color, vec3<f32>(1.0 / 2.2)), 1.0);
+    }
+    
+    // Sky gradient
+    let sky = mix(vec3<f32>(0.6, 0.7, 0.9), vec3<f32>(0.9, 0.95, 1.0), uv.y * 0.5 + 0.5);
+    return vec4<f32>(pow(sky, vec3<f32>(1.0 / 2.2)), 1.0);
 }
 `;
 
@@ -1082,47 +691,85 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
                 label: 'Uniform Buffer'
             });
             
-            // ✅ SCENE DATA: START WITH 0 OBJECTS, DEFAULT VALUES FOR ALL SLOTS
-            sceneData = new Float32Array([
-                // Header: num_spheres=0, num_boxes=0, num_tori=0, padding
-                0, 0, 0, 0,
-                
-                // Spheres 0-9 (default values: various positions/colors)
-                0,0,0,0.5, 1,0.3,0.3,0,         // Sphere 0 (red) - center
-                -1.5,0.3,0,0.4, 0.3,0.5,1,0,    // Sphere 1 (blue) - left
-                0,0.5,-1.5,0.35, 1,1,0.3,0,     // Sphere 2 (yellow) - back
-                1.5,0.3,0,0.4, 0.6,0.3,1,0,     // Sphere 3 (purple) - right
-                0,0.5,1.5,0.4, 1,0.4,0.6,0,     // Sphere 4 (pink) - front
-                -1,0.3,-1,0.35, 0.2,0.8,0.9,0,  // Sphere 5 (cyan) - back-left
-                1,0.3,-1,0.35, 0.1,0.7,0.5,0,   // Sphere 6 (teal) - back-right
-                -1,0.3,1,0.35, 0.4,0.2,0.8,0,   // Sphere 7 (indigo) - front-left
-                1,0.3,1,0.35, 0.7,0.3,0.9,0,    // Sphere 8 (violet) - front-right
-                0,1,0,0.3, 0.9,0.2,0.3,0,       // Sphere 9 (rose) - top
-                
-                // Boxes 0-9 (default values)
-                1.5,0,0,0, 0.4,0.4,0.4,0, 0.3,1,0.3,0,    // Box 0 (green)
-                0,-0.2,1,0, 0.3,0.3,0.3,0, 1,0.3,1,0,     // Box 1 (magenta)
-                0,0,0,0, 0.3,0.3,0.3,0, 0.2,0.5,0.9,0,    // Box 2 (blue)
-                0,0,0,0, 0.3,0.3,0.3,0, 0.4,0.4,1,0,      // Box 3 (indigo)
-                0,0,0,0, 0.3,0.3,0.3,0, 0.7,0.3,0.9,0,    // Box 4 (purple)
-                0,0,0,0, 0.3,0.3,0.3,0, 0.9,0.3,0.6,0,    // Box 5 (pink)
-                0,0,0,0, 0.3,0.3,0.3,0, 0.9,0.2,0.2,0,    // Box 6 (rose)
-                0,0,0,0, 0.3,0.3,0.3,0, 1,0.5,0.1,0,      // Box 7 (orange)
-                0,0,0,0, 0.3,0.3,0.3,0, 0.9,0.8,0.1,0,    // Box 8 (amber)
-                0,0,0,0, 0.3,0.3,0.3,0, 0.5,0.8,0.1,0,    // Box 9 (lime)
-                
-                // Tori 0-9 (default values)
-                -1.5,0.5,1,0, 0.4,0.15,0,0, 0.3,1,1,0,    // Torus 0 (cyan)
-                1.5,0.3,-1,0, 0.35,0.12,0,0, 1,0.6,0.2,0, // Torus 1 (orange)
-                0,0,0,0, 0.3,0.1,0,0, 0.9,0.2,0.2,0,      // Torus 2 (red)
-                0,0,0,0, 0.3,0.1,0,0, 0.9,0.4,0.4,0,      // Torus 3 (red)
-                0,0,0,0, 0.3,0.1,0,0, 0.9,0.6,0.2,0,      // Torus 4 (orange)
-                0,0,0,0, 0.3,0.1,0,0, 0.9,0.7,0.1,0,      // Torus 5 (yellow)
-                0,0,0,0, 0.3,0.1,0,0, 0.3,0.9,0.3,0,      // Torus 6 (green)
-                0,0,0,0, 0.3,0.1,0,0, 0.1,0.9,0.9,0,      // Torus 7 (cyan)
-                0,0,0,0, 0.3,0.1,0,0, 0.1,0.6,0.9,0,      // Torus 8 (blue)
-                0,0,0,0, 0.3,0.1,0,0, 0.4,0.4,1,0         // Torus 9 (indigo)
-            ]);
+            // Scene buffer layout:
+            // Header: 4 u32 (16 bytes)
+            // Spheres: 10 * 12 floats = 120 floats (480 bytes)
+            // Boxes: 10 * 16 floats = 160 floats (640 bytes)
+            // Tori: 10 * 16 floats = 160 floats (640 bytes)
+            // Total: 4 + 440 = 444 floats = 1776 bytes
+            
+            const defaultColors = [
+                [1.0, 0.3, 0.3], // Red
+                [0.3, 0.5, 1.0], // Blue
+                [1.0, 1.0, 0.3], // Yellow
+                [0.7, 0.3, 1.0], // Purple
+                [1.0, 0.5, 0.7], // Pink
+                [0.3, 0.9, 0.9], // Cyan
+                [0.2, 0.8, 0.5], // Teal
+                [0.5, 0.3, 0.9], // Indigo
+                [0.8, 0.4, 1.0], // Violet
+                [1.0, 0.4, 0.5], // Rose
+            ];
+            
+            sceneData = new Float32Array(444);
+            
+            // Initialize header to 0
+            sceneData[0] = 0; // num_spheres
+            sceneData[1] = 0; // num_boxes
+            sceneData[2] = 0; // num_tori
+            sceneData[3] = 0; // padding
+            
+            // Initialize spheres (12 floats each)
+            for (let i = 0; i < 10; i++) {
+                const offset = 4 + i * 12;
+                sceneData[offset + 0] = i * 0.8 - 2.0;  // x
+                sceneData[offset + 1] = 0.5;            // y
+                sceneData[offset + 2] = 0.0;            // z
+                sceneData[offset + 3] = 0.4;            // radius
+                sceneData[offset + 4] = defaultColors[i][0]; // R
+                sceneData[offset + 5] = defaultColors[i][1]; // G
+                sceneData[offset + 6] = defaultColors[i][2]; // B
+                sceneData[offset + 7] = 0.0;            // blend_mode (Normal)
+                sceneData[offset + 8] = 0.3;            // blend_amount
+            }
+            
+            // Initialize boxes (16 floats each)
+            for (let i = 0; i < 10; i++) {
+                const offset = 4 + 120 + i * 16;
+                sceneData[offset + 0] = i * 0.8 - 2.0;  // x
+                sceneData[offset + 1] = 0.3;            // y
+                sceneData[offset + 2] = 1.5;            // z
+                sceneData[offset + 3] = 0.0;            // padding
+                sceneData[offset + 4] = 0.3;            // size x
+                sceneData[offset + 5] = 0.3;            // size y
+                sceneData[offset + 6] = 0.3;            // size z
+                sceneData[offset + 7] = 0.0;            // padding
+                const ci = (i + 3) % 10;
+                sceneData[offset + 8] = defaultColors[ci][0];  // R
+                sceneData[offset + 9] = defaultColors[ci][1];  // G
+                sceneData[offset + 10] = defaultColors[ci][2]; // B
+                sceneData[offset + 11] = 0.0;           // blend_mode
+                sceneData[offset + 12] = 0.3;           // blend_amount
+            }
+            
+            // Initialize tori (16 floats each)
+            for (let i = 0; i < 10; i++) {
+                const offset = 4 + 120 + 160 + i * 16;
+                sceneData[offset + 0] = i * 0.8 - 2.0;  // x
+                sceneData[offset + 1] = 0.5;            // y
+                sceneData[offset + 2] = -1.5;           // z
+                sceneData[offset + 3] = 0.0;            // padding
+                sceneData[offset + 4] = 0.35;           // major radius
+                sceneData[offset + 5] = 0.12;           // minor radius
+                sceneData[offset + 6] = 0.0;            // padding
+                sceneData[offset + 7] = 0.0;            // padding
+                const ci = (i + 5) % 10;
+                sceneData[offset + 8] = defaultColors[ci][0];  // R
+                sceneData[offset + 9] = defaultColors[ci][1];  // G
+                sceneData[offset + 10] = defaultColors[ci][2]; // B
+                sceneData[offset + 11] = 0.0;           // blend_mode
+                sceneData[offset + 12] = 0.3;           // blend_amount
+            }
             
             sceneBuffer = device.createBuffer({
                 size: sceneData.byteLength,
@@ -1130,17 +777,12 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
                 label: 'Scene Buffer'
             });
             
-            // ✅ Write full buffer, but use Uint32Array for header (since they're u32 in shader)
+            // Write initial data
             const headerData = new Uint32Array([0, 0, 0, 0]);
             device.queue.writeBuffer(sceneBuffer, 0, headerData);
-            device.queue.writeBuffer(sceneBuffer, 16, sceneData, 4); // Write the rest (starting from offset 16 bytes = 4 floats)
-            console.log('✅ Scene buffer initialized with header:', headerData);
+            device.queue.writeBuffer(sceneBuffer, 16, sceneData.subarray(4));
             
-            console.log('🎯 Initializing object picker...');
-            objectPicker = new ObjectPicker(device, canvas, sceneData);
-            await objectPicker.init(uniformBuffer, sceneBuffer);
-            
-            await compileShader(fallbackShader);
+            await compileShader(mainShader);
             
             return true;
         }
@@ -1257,422 +899,308 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
         }
         
         // ================================================
-        // SCENE EDITOR CONTROLS - START FROM ZERO
+        // DYNAMIC UI GENERATION
         // ================================================
         
-        let setupSceneEditorCalled = false;
+        const sphereNames = ['🔴 Red', '🔵 Blue', '🟡 Yellow', '🟣 Purple', '🩷 Pink', '🔷 Cyan', '🟢 Teal', '🔹 Indigo', '💜 Violet', '🌹 Rose'];
+        const boxNames = ['🟩 Green', '🟪 Magenta', '🟦 Blue', '🟧 Orange', '🟥 Red', '💙 Cyan', '💚 Lime', '💛 Yellow', '🧡 Amber', '💜 Purple'];
+        const torusNames = ['🍩 Cyan', '🍩 Orange', '🍩 Red', '🍩 Pink', '🍩 Yellow', '🍩 Green', '🍩 Blue', '🍩 Indigo', '🍩 Violet', '🍩 Rose'];
         
-        // ✅ Global counters - accessible everywhere
-        let activeSpheres = 0;
-        let activeBoxes = 0;
-        let activeTori = 0;
-        
-        function setupSceneEditor() {
-            console.log('🎬 setupSceneEditor() called');
+        function createObjectPanel(type, index) {
+            const names = type === 'sphere' ? sphereNames : type === 'box' ? boxNames : torusNames;
+            const colorClass = type === 'sphere' ? 'text-red-400' : type === 'box' ? 'text-green-400' : 'text-cyan-400';
             
-            if (setupSceneEditorCalled) {
-                console.warn('⚠️ setupSceneEditor already called, skipping...');
-                return;
-            }
-            setupSceneEditorCalled = true;
-            console.log('✅ setupSceneEditor executing for the first time');
+            const panel = document.createElement('div');
+            panel.id = `${type}-${index}-panel`;
+            panel.className = 'space-y-3 mb-4 p-3 bg-gray-800 rounded-lg border border-gray-600';
+            panel.style.display = 'none';
             
-            console.log('📊 Initial state:', { activeSpheres, activeBoxes, activeTori });
-            
-            function updateCounts() {
-                console.log('🔄 updateCounts called');
-                console.log('  Before update - sceneData header:', sceneData.slice(0, 4));
-                console.log('  Variables:', { activeSpheres, activeBoxes, activeTori });
-                
-                sceneData[0] = activeSpheres;
-                sceneData[1] = activeBoxes;
-                sceneData[2] = activeTori;
-                
-                console.log('  After update - sceneData header:', sceneData.slice(0, 4));
-                
-                if (device && sceneBuffer) {
-                    // ✅ Write header as Uint32Array (since they're u32 in the shader)
-                    const headerData = new Uint32Array([activeSpheres, activeBoxes, activeTori, 0]);
-                    device.queue.writeBuffer(sceneBuffer, 0, headerData);
-                    console.log('  ✅ Written to GPU buffer as Uint32:', headerData);
-                }
-                
-                document.getElementById('sphere-count').textContent = activeSpheres;
-                document.getElementById('box-count').textContent = activeBoxes;
-                document.getElementById('torus-count').textContent = activeTori;
-                
-                console.log('  ✅ UI updated');
-                
-                // Update panel visibility
-                for (let i = 0; i < 10; i++) {
-                    const spherePanel = document.getElementById(`sphere-${i}-panel`);
-                    const boxPanel = document.getElementById(`box-${i}-panel`);
-                    const torusPanel = document.getElementById(`torus-${i}-panel`);
-                    
-                    if (spherePanel) {
-                        const shouldShowSphere = i < activeSpheres;
-                        spherePanel.style.display = shouldShowSphere ? 'block' : 'none';
-                        if (shouldShowSphere !== (spherePanel.style.display === 'block')) {
-                            console.log(`  Sphere ${i} panel: ${shouldShowSphere ? 'showing' : 'hiding'}`);
-                        }
-                    }
-                    if (boxPanel) {
-                        const shouldShowBox = i < activeBoxes;
-                        boxPanel.style.display = shouldShowBox ? 'block' : 'none';
-                    }
-                    if (torusPanel) {
-                        const shouldShowTorus = i < activeTori;
-                        torusPanel.style.display = shouldShowTorus ? 'block' : 'none';
-                    }
-                }
-                
-                console.log('  ✅ Panels visibility updated');
+            let sizeControls = '';
+            if (type === 'sphere') {
+                sizeControls = `
+                    <div>
+                        <label class="text-xs flex justify-between mb-1">
+                            <span class="text-gray-400">Radius</span>
+                            <span id="${type}-${index}-radius-value" class="font-mono text-yellow-400">0.40</span>
+                        </label>
+                        <input type="range" id="${type}-${index}-radius" min="0.1" max="1.5" step="0.01" value="0.4" class="w-full">
+                    </div>
+                `;
+            } else if (type === 'box') {
+                sizeControls = `
+                    <div>
+                        <label class="text-xs flex justify-between mb-1">
+                            <span class="text-gray-400">Size</span>
+                            <span id="${type}-${index}-size-value" class="font-mono text-yellow-400">0.30</span>
+                        </label>
+                        <input type="range" id="${type}-${index}-size" min="0.1" max="1.0" step="0.01" value="0.3" class="w-full">
+                    </div>
+                `;
+            } else {
+                sizeControls = `
+                    <div>
+                        <label class="text-xs flex justify-between mb-1">
+                            <span class="text-gray-400">Major R</span>
+                            <span id="${type}-${index}-major-value" class="font-mono text-yellow-400">0.35</span>
+                        </label>
+                        <input type="range" id="${type}-${index}-major" min="0.1" max="0.8" step="0.01" value="0.35" class="w-full">
+                    </div>
+                    <div>
+                        <label class="text-xs flex justify-between mb-1">
+                            <span class="text-gray-400">Minor R</span>
+                            <span id="${type}-${index}-minor-value" class="font-mono text-yellow-400">0.12</span>
+                        </label>
+                        <input type="range" id="${type}-${index}-minor" min="0.03" max="0.3" step="0.01" value="0.12" class="w-full">
+                    </div>
+                `;
             }
             
-            // Add/Remove buttons
-            document.getElementById('add-sphere-btn').addEventListener('click', () => {
-                console.log('🔘 Add Sphere button clicked, current activeSpheres:', activeSpheres);
-                if (activeSpheres < 10) {
-                    activeSpheres++;
-                    console.log('✅ Added sphere, new count:', activeSpheres);
-                    
-                    // Debug: Show position of the new sphere
-                    const baseOffset = 4 + (activeSpheres - 1) * 8;
-                    const pos = {
-                        x: sceneData[baseOffset + 0],
-                        y: sceneData[baseOffset + 1],
-                        z: sceneData[baseOffset + 2],
-                        radius: sceneData[baseOffset + 3]
-                    };
-                    console.log(`  Sphere ${activeSpheres - 1} position:`, pos);
-                    
-                    updateCounts();
-                } else {
-                    console.log('❌ Cannot add sphere, already at max (10)');
-                }
-            });
-            
-            document.getElementById('remove-sphere-btn').addEventListener('click', () => {
-                console.log('🔘 Remove Sphere button clicked, current activeSpheres:', activeSpheres);
-                if (activeSpheres > 0) {
-                    activeSpheres--;
-                    console.log('✅ Removed sphere, new count:', activeSpheres);
-                    updateCounts();
-                } else {
-                    console.log('❌ Cannot remove sphere, already at 0');
-                }
-            });
-            
-            document.getElementById('add-box-btn').addEventListener('click', () => {
-                console.log('🔘 Add Box button clicked, current activeBoxes:', activeBoxes);
-                if (activeBoxes < 10) {
-                    activeBoxes++;
-                    console.log('✅ Added box, new count:', activeBoxes);
-                    updateCounts();
-                } else {
-                    console.log('❌ Cannot add box, already at max (10)');
-                }
-            });
-            
-            document.getElementById('remove-box-btn').addEventListener('click', () => {
-                console.log('🔘 Remove Box button clicked, current activeBoxes:', activeBoxes);
-                if (activeBoxes > 0) {
-                    activeBoxes--;
-                    console.log('✅ Removed box, new count:', activeBoxes);
-                    updateCounts();
-                } else {
-                    console.log('❌ Cannot remove box, already at 0');
-                }
-            });
-            
-            document.getElementById('add-torus-btn').addEventListener('click', () => {
-                console.log('🔘 Add Torus button clicked, current activeTori:', activeTori);
-                if (activeTori < 10) {
-                    activeTori++;
-                    console.log('✅ Added torus, new count:', activeTori);
-                    updateCounts();
-                } else {
-                    console.log('❌ Cannot add torus, already at max (10)');
-                }
-            });
-            
-            document.getElementById('remove-torus-btn').addEventListener('click', () => {
-                console.log('🔘 Remove Torus button clicked, current activeTori:', activeTori);
-                if (activeTori > 0) {
-                    activeTori--;
-                    console.log('✅ Removed torus, new count:', activeTori);
-                    updateCounts();
-                } else {
-                    console.log('❌ Cannot remove torus, already at 0');
-                }
-            });
-            
-            // Setup sphere updaters
-            function createSphereUpdater(index) {
-                const baseOffset = 4 + index * 8;
-                const controls = {
-                    x: document.getElementById(`sphere-${index}-x`),
-                    y: document.getElementById(`sphere-${index}-y`),
-                    z: document.getElementById(`sphere-${index}-z`),
-                    radius: document.getElementById(`sphere-${index}-radius`),
-                    color: document.getElementById(`sphere-${index}-color`)
-                };
+            panel.innerHTML = `
+                <div class="text-sm font-semibold ${colorClass} mb-2">${names[index]} ${type.charAt(0).toUpperCase() + type.slice(1)} ${index + 1}</div>
                 
-                if (!controls.x) return;
+                <div class="grid grid-cols-3 gap-2">
+                    <div>
+                        <label class="text-xs block mb-1 text-gray-500">X</label>
+                        <input type="range" id="${type}-${index}-x" min="-4" max="4" step="0.05" value="0" class="w-full">
+                        <div id="${type}-${index}-x-value" class="text-xs text-center font-mono text-yellow-400">0.00</div>
+                    </div>
+                    <div>
+                        <label class="text-xs block mb-1 text-gray-500">Y</label>
+                        <input type="range" id="${type}-${index}-y" min="-2" max="3" step="0.05" value="0.5" class="w-full">
+                        <div id="${type}-${index}-y-value" class="text-xs text-center font-mono text-yellow-400">0.50</div>
+                    </div>
+                    <div>
+                        <label class="text-xs block mb-1 text-gray-500">Z</label>
+                        <input type="range" id="${type}-${index}-z" min="-4" max="4" step="0.05" value="0" class="w-full">
+                        <div id="${type}-${index}-z-value" class="text-xs text-center font-mono text-yellow-400">0.00</div>
+                    </div>
+                </div>
                 
-                // ✅ CRITICAL FIX: Initialize sliders FROM sceneData BEFORE update()
-                // Otherwise update() will overwrite sceneData with slider defaults (0, 0, 0)
-                controls.x.value = sceneData[baseOffset + 0];
-                controls.y.value = sceneData[baseOffset + 1];
-                controls.z.value = sceneData[baseOffset + 2];
+                ${sizeControls}
+                
+                <div>
+                    <label class="text-xs block mb-1 text-gray-400">Color</label>
+                    <input type="color" id="${type}-${index}-color" value="#ff4d4d" class="w-full h-8 rounded cursor-pointer border border-gray-600">
+                </div>
+                
+                <div class="csg-controls">
+                    <div class="text-xs font-semibold text-purple-400 mb-2">⚙️ CSG Mode</div>
+                    <select id="${type}-${index}-blend-mode" class="w-full bg-gray-700 text-white rounded px-2 py-1 text-xs mb-2">
+                        <option value="0">Normal (No blend)</option>
+                        <option value="1">Smooth Union (Merge)</option>
+                        <option value="2">Subtract (Cut)</option>
+                        <option value="3">Intersect (Overlap)</option>
+                        <option value="4">XOR (Exclude)</option>
+                    </select>
+                    <div>
+                        <label class="text-xs flex justify-between mb-1">
+                            <span class="text-gray-400">Smoothness</span>
+                            <span id="${type}-${index}-blend-amount-value" class="font-mono text-purple-400">0.30</span>
+                        </label>
+                        <input type="range" id="${type}-${index}-blend-amount" min="0.05" max="1.0" step="0.05" value="0.3" class="w-full">
+                    </div>
+                </div>
+            `;
+            
+            return panel;
+        }
+        
+        function setupObjectUpdater(type, index) {
+            let baseOffset;
+            if (type === 'sphere') {
+                baseOffset = 4 + index * 12;
+            } else if (type === 'box') {
+                baseOffset = 4 + 120 + index * 16;
+            } else {
+                baseOffset = 4 + 120 + 160 + index * 16;
+            }
+            
+            const controls = {
+                x: document.getElementById(`${type}-${index}-x`),
+                y: document.getElementById(`${type}-${index}-y`),
+                z: document.getElementById(`${type}-${index}-z`),
+                color: document.getElementById(`${type}-${index}-color`),
+                blendMode: document.getElementById(`${type}-${index}-blend-mode`),
+                blendAmount: document.getElementById(`${type}-${index}-blend-amount`)
+            };
+            
+            if (type === 'sphere') {
+                controls.radius = document.getElementById(`${type}-${index}-radius`);
+            } else if (type === 'box') {
+                controls.size = document.getElementById(`${type}-${index}-size`);
+            } else {
+                controls.major = document.getElementById(`${type}-${index}-major`);
+                controls.minor = document.getElementById(`${type}-${index}-minor`);
+            }
+            
+            // Initialize from sceneData
+            controls.x.value = sceneData[baseOffset + 0];
+            controls.y.value = sceneData[baseOffset + 1];
+            controls.z.value = sceneData[baseOffset + 2];
+            
+            if (type === 'sphere') {
                 controls.radius.value = sceneData[baseOffset + 3];
-                
-                // Convert RGB from sceneData to hex color
-                const r = Math.round(sceneData[baseOffset + 4] * 255);
-                const g = Math.round(sceneData[baseOffset + 5] * 255);
-                const b = Math.round(sceneData[baseOffset + 6] * 255);
-                controls.color.value = '#' + 
-                    r.toString(16).padStart(2, '0') + 
-                    g.toString(16).padStart(2, '0') + 
-                    b.toString(16).padStart(2, '0');
-                
-                function update() {
-                    sceneData[baseOffset + 0] = parseFloat(controls.x.value);
-                    sceneData[baseOffset + 1] = parseFloat(controls.y.value);
-                    sceneData[baseOffset + 2] = parseFloat(controls.z.value);
-                    sceneData[baseOffset + 3] = parseFloat(controls.radius.value);
-                    
-                    const hex = controls.color.value;
-                    sceneData[baseOffset + 4] = parseInt(hex.slice(1, 3), 16) / 255.0;
-                    sceneData[baseOffset + 5] = parseInt(hex.slice(3, 5), 16) / 255.0;
-                    sceneData[baseOffset + 6] = parseInt(hex.slice(5, 7), 16) / 255.0;
-                    sceneData[baseOffset + 7] = 0.0;
-                    
-                    if (device && sceneBuffer) {
-                        device.queue.writeBuffer(sceneBuffer, baseOffset * 4, sceneData, baseOffset, 8);
-                    }
-                    
-                    document.getElementById(`sphere-${index}-x-value`).textContent = parseFloat(controls.x.value).toFixed(2);
-                    document.getElementById(`sphere-${index}-y-value`).textContent = parseFloat(controls.y.value).toFixed(2);
-                    document.getElementById(`sphere-${index}-z-value`).textContent = parseFloat(controls.z.value).toFixed(2);
-                    document.getElementById(`sphere-${index}-radius-value`).textContent = parseFloat(controls.radius.value).toFixed(2);
-                }
-                
-                controls.x.addEventListener('input', update);
-                controls.y.addEventListener('input', update);
-                controls.z.addEventListener('input', update);
-                controls.radius.addEventListener('input', update);
-                controls.color.addEventListener('input', update);
-                
-                // ✅ Now it's safe to call update() - it will write the correct values
-                update();
+            } else if (type === 'box') {
+                controls.size.value = sceneData[baseOffset + 4];
+            } else {
+                controls.major.value = sceneData[baseOffset + 4];
+                controls.minor.value = sceneData[baseOffset + 5];
             }
             
-            // Setup box updaters
-            function createBoxUpdater(index) {
-                const baseOffset = 4 + 80 + index * 12;
-                const controls = {
-                    x: document.getElementById(`box-${index}-x`),
-                    y: document.getElementById(`box-${index}-y`),
-                    z: document.getElementById(`box-${index}-z`),
-                    size: document.getElementById(`box-${index}-size`),
-                    color: document.getElementById(`box-${index}-color`)
-                };
+            // Color
+            const colorOffset = type === 'sphere' ? 4 : 8;
+            const r = Math.round(sceneData[baseOffset + colorOffset] * 255);
+            const g = Math.round(sceneData[baseOffset + colorOffset + 1] * 255);
+            const b = Math.round(sceneData[baseOffset + colorOffset + 2] * 255);
+            controls.color.value = '#' + r.toString(16).padStart(2, '0') + g.toString(16).padStart(2, '0') + b.toString(16).padStart(2, '0');
+            
+            // CSG
+            const blendOffset = type === 'sphere' ? 7 : 11;
+            controls.blendMode.value = Math.round(sceneData[baseOffset + blendOffset]);
+            controls.blendAmount.value = sceneData[baseOffset + blendOffset + 1];
+            
+            function update() {
+                // Position
+                sceneData[baseOffset + 0] = parseFloat(controls.x.value);
+                sceneData[baseOffset + 1] = parseFloat(controls.y.value);
+                sceneData[baseOffset + 2] = parseFloat(controls.z.value);
                 
-                if (!controls.x) return;
+                // Update displays
+                document.getElementById(`${type}-${index}-x-value`).textContent = parseFloat(controls.x.value).toFixed(2);
+                document.getElementById(`${type}-${index}-y-value`).textContent = parseFloat(controls.y.value).toFixed(2);
+                document.getElementById(`${type}-${index}-z-value`).textContent = parseFloat(controls.z.value).toFixed(2);
                 
-                // ✅ CRITICAL FIX: Initialize sliders FROM sceneData
-                controls.x.value = sceneData[baseOffset + 0];
-                controls.y.value = sceneData[baseOffset + 1];
-                controls.z.value = sceneData[baseOffset + 2];
-                controls.size.value = sceneData[baseOffset + 4]; // size.x
-                
-                // Convert RGB to hex
-                const r = Math.round(sceneData[baseOffset + 8] * 255);
-                const g = Math.round(sceneData[baseOffset + 9] * 255);
-                const b = Math.round(sceneData[baseOffset + 10] * 255);
-                controls.color.value = '#' + 
-                    r.toString(16).padStart(2, '0') + 
-                    g.toString(16).padStart(2, '0') + 
-                    b.toString(16).padStart(2, '0');
-                
-                function update() {
-                    sceneData[baseOffset + 0] = parseFloat(controls.x.value);
-                    sceneData[baseOffset + 1] = parseFloat(controls.y.value);
-                    sceneData[baseOffset + 2] = parseFloat(controls.z.value);
-                    sceneData[baseOffset + 3] = 0.0;
-                    
+                if (type === 'sphere') {
+                    sceneData[baseOffset + 3] = parseFloat(controls.radius.value);
+                    document.getElementById(`${type}-${index}-radius-value`).textContent = parseFloat(controls.radius.value).toFixed(2);
+                } else if (type === 'box') {
                     const size = parseFloat(controls.size.value);
                     sceneData[baseOffset + 4] = size;
                     sceneData[baseOffset + 5] = size;
                     sceneData[baseOffset + 6] = size;
-                    sceneData[baseOffset + 7] = 0.0;
-                    
-                    const hex = controls.color.value;
-                    sceneData[baseOffset + 8] = parseInt(hex.slice(1, 3), 16) / 255.0;
-                    sceneData[baseOffset + 9] = parseInt(hex.slice(3, 5), 16) / 255.0;
-                    sceneData[baseOffset + 10] = parseInt(hex.slice(5, 7), 16) / 255.0;
-                    sceneData[baseOffset + 11] = 0.0;
-                    
-                    if (device && sceneBuffer) {
-                        device.queue.writeBuffer(sceneBuffer, baseOffset * 4, sceneData, baseOffset, 12);
-                    }
-                    
-                    document.getElementById(`box-${index}-x-value`).textContent = parseFloat(controls.x.value).toFixed(2);
-                    document.getElementById(`box-${index}-y-value`).textContent = parseFloat(controls.y.value).toFixed(2);
-                    document.getElementById(`box-${index}-z-value`).textContent = parseFloat(controls.z.value).toFixed(2);
-                    document.getElementById(`box-${index}-size-value`).textContent = size.toFixed(2);
-                }
-                
-                controls.x.addEventListener('input', update);
-                controls.y.addEventListener('input', update);
-                controls.z.addEventListener('input', update);
-                controls.size.addEventListener('input', update);
-                controls.color.addEventListener('input', update);
-                
-                update();
-            }
-            
-            // Setup torus updaters
-            function createTorusUpdater(index) {
-                const baseOffset = 4 + 80 + 120 + index * 12;
-                const controls = {
-                    x: document.getElementById(`torus-${index}-x`),
-                    y: document.getElementById(`torus-${index}-y`),
-                    z: document.getElementById(`torus-${index}-z`),
-                    major: document.getElementById(`torus-${index}-major`),
-                    minor: document.getElementById(`torus-${index}-minor`),
-                    color: document.getElementById(`torus-${index}-color`)
-                };
-                
-                if (!controls.x) return;
-                
-                // ✅ CRITICAL FIX: Initialize sliders FROM sceneData
-                controls.x.value = sceneData[baseOffset + 0];
-                controls.y.value = sceneData[baseOffset + 1];
-                controls.z.value = sceneData[baseOffset + 2];
-                controls.major.value = sceneData[baseOffset + 4];
-                controls.minor.value = sceneData[baseOffset + 5];
-                
-                // Convert RGB to hex
-                const r = Math.round(sceneData[baseOffset + 8] * 255);
-                const g = Math.round(sceneData[baseOffset + 9] * 255);
-                const b = Math.round(sceneData[baseOffset + 10] * 255);
-                controls.color.value = '#' + 
-                    r.toString(16).padStart(2, '0') + 
-                    g.toString(16).padStart(2, '0') + 
-                    b.toString(16).padStart(2, '0');
-                
-                function update() {
-                    sceneData[baseOffset + 0] = parseFloat(controls.x.value);
-                    sceneData[baseOffset + 1] = parseFloat(controls.y.value);
-                    sceneData[baseOffset + 2] = parseFloat(controls.z.value);
-                    sceneData[baseOffset + 3] = 0.0;
-                    
+                    document.getElementById(`${type}-${index}-size-value`).textContent = size.toFixed(2);
+                } else {
                     sceneData[baseOffset + 4] = parseFloat(controls.major.value);
                     sceneData[baseOffset + 5] = parseFloat(controls.minor.value);
-                    sceneData[baseOffset + 6] = 0.0;
-                    sceneData[baseOffset + 7] = 0.0;
-                    
-                    const hex = controls.color.value;
-                    sceneData[baseOffset + 8] = parseInt(hex.slice(1, 3), 16) / 255.0;
-                    sceneData[baseOffset + 9] = parseInt(hex.slice(3, 5), 16) / 255.0;
-                    sceneData[baseOffset + 10] = parseInt(hex.slice(5, 7), 16) / 255.0;
-                    sceneData[baseOffset + 11] = 0.0;
-                    
-                    if (device && sceneBuffer) {
-                        device.queue.writeBuffer(sceneBuffer, baseOffset * 4, sceneData, baseOffset, 12);
-                    }
-                    
-                    document.getElementById(`torus-${index}-x-value`).textContent = parseFloat(controls.x.value).toFixed(2);
-                    document.getElementById(`torus-${index}-y-value`).textContent = parseFloat(controls.y.value).toFixed(2);
-                    document.getElementById(`torus-${index}-z-value`).textContent = parseFloat(controls.z.value).toFixed(2);
-                    document.getElementById(`torus-${index}-major-value`).textContent = parseFloat(controls.major.value).toFixed(2);
-                    document.getElementById(`torus-${index}-minor-value`).textContent = parseFloat(controls.minor.value).toFixed(2);
+                    document.getElementById(`${type}-${index}-major-value`).textContent = parseFloat(controls.major.value).toFixed(2);
+                    document.getElementById(`${type}-${index}-minor-value`).textContent = parseFloat(controls.minor.value).toFixed(2);
                 }
                 
-                controls.x.addEventListener('input', update);
-                controls.y.addEventListener('input', update);
-                controls.z.addEventListener('input', update);
-                controls.major.addEventListener('input', update);
-                controls.minor.addEventListener('input', update);
-                controls.color.addEventListener('input', update);
+                // Color
+                const hex = controls.color.value;
+                sceneData[baseOffset + colorOffset] = parseInt(hex.slice(1, 3), 16) / 255.0;
+                sceneData[baseOffset + colorOffset + 1] = parseInt(hex.slice(3, 5), 16) / 255.0;
+                sceneData[baseOffset + colorOffset + 2] = parseInt(hex.slice(5, 7), 16) / 255.0;
                 
-                update();
+                // CSG
+                sceneData[baseOffset + blendOffset] = parseFloat(controls.blendMode.value);
+                sceneData[baseOffset + blendOffset + 1] = parseFloat(controls.blendAmount.value);
+                document.getElementById(`${type}-${index}-blend-amount-value`).textContent = parseFloat(controls.blendAmount.value).toFixed(2);
+                
+                // Write to GPU
+                if (device && sceneBuffer) {
+                    const floatCount = type === 'sphere' ? 12 : 16;
+                    device.queue.writeBuffer(sceneBuffer, baseOffset * 4, sceneData.subarray(baseOffset, baseOffset + floatCount));
+                }
             }
             
-            // Setup all object updaters
+            // Add listeners
+            controls.x.addEventListener('input', update);
+            controls.y.addEventListener('input', update);
+            controls.z.addEventListener('input', update);
+            controls.color.addEventListener('input', update);
+            controls.blendMode.addEventListener('change', update);
+            controls.blendAmount.addEventListener('input', update);
+            
+            if (controls.radius) controls.radius.addEventListener('input', update);
+            if (controls.size) controls.size.addEventListener('input', update);
+            if (controls.major) controls.major.addEventListener('input', update);
+            if (controls.minor) controls.minor.addEventListener('input', update);
+            
+            // Initial update
+            update();
+        }
+        
+        function setupSceneEditor() {
+            const container = document.getElementById('object-panels-container');
+            
+            // Create all panels
             for (let i = 0; i < 10; i++) {
-                createSphereUpdater(i);
-                createBoxUpdater(i);
-                createTorusUpdater(i);
+                container.appendChild(createObjectPanel('sphere', i));
+                container.appendChild(createObjectPanel('box', i));
+                container.appendChild(createObjectPanel('torus', i));
             }
             
-            // ✅ FORCE RESET TO 0 OBJECTS
-            // This ensures the counters are REALLY at 0, even if update() was called
-            activeSpheres = 0;
-            activeBoxes = 0;
-            activeTori = 0;
+            // Setup updaters
+            for (let i = 0; i < 10; i++) {
+                setupObjectUpdater('sphere', i);
+                setupObjectUpdater('box', i);
+                setupObjectUpdater('torus', i);
+            }
             
-            // Write the header AFTER all updaters are set up
-            sceneData[0] = 0;
-            sceneData[1] = 0;
-            sceneData[2] = 0;
-            sceneData[3] = 0;
-            
-            if (device && sceneBuffer) {
-                // ✅ Write header as Uint32Array since they're u32 in the shader
-                const headerData = new Uint32Array([0, 0, 0, 0]);
+            function updateCounts() {
+                // Update header
+                const headerData = new Uint32Array([activeSpheres, activeBoxes, activeTori, 0]);
                 device.queue.writeBuffer(sceneBuffer, 0, headerData);
-                console.log('✅ Buffer header reset to:', headerData);
+                
+                // Update UI
+                document.getElementById('sphere-count').textContent = activeSpheres;
+                document.getElementById('box-count').textContent = activeBoxes;
+                document.getElementById('torus-count').textContent = activeTori;
+                
+                // Show/hide panels
+                for (let i = 0; i < 10; i++) {
+                    document.getElementById(`sphere-${i}-panel`).style.display = i < activeSpheres ? 'block' : 'none';
+                    document.getElementById(`box-${i}-panel`).style.display = i < activeBoxes ? 'block' : 'none';
+                    document.getElementById(`torus-${i}-panel`).style.display = i < activeTori ? 'block' : 'none';
+                }
             }
+            
+            // Add/Remove buttons
+            document.getElementById('add-sphere-btn').addEventListener('click', () => {
+                if (activeSpheres < 10) {
+                    activeSpheres++;
+                    updateCounts();
+                }
+            });
+            
+            document.getElementById('remove-sphere-btn').addEventListener('click', () => {
+                if (activeSpheres > 0) {
+                    activeSpheres--;
+                    updateCounts();
+                }
+            });
+            
+            document.getElementById('add-box-btn').addEventListener('click', () => {
+                if (activeBoxes < 10) {
+                    activeBoxes++;
+                    updateCounts();
+                }
+            });
+            
+            document.getElementById('remove-box-btn').addEventListener('click', () => {
+                if (activeBoxes > 0) {
+                    activeBoxes--;
+                    updateCounts();
+                }
+            });
+            
+            document.getElementById('add-torus-btn').addEventListener('click', () => {
+                if (activeTori < 10) {
+                    activeTori++;
+                    updateCounts();
+                }
+            });
+            
+            document.getElementById('remove-torus-btn').addEventListener('click', () => {
+                if (activeTori > 0) {
+                    activeTori--;
+                    updateCounts();
+                }
+            });
             
             // Initialize with 0 objects
             updateCounts();
-        }
-        
-        // ================================================
-        // SHADER LOADER
-        // ================================================
-        
-        async function loadShaders() {
-            try {
-                const response = await fetch('shaders/manifest.json');
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch manifest: ${response.status}`);
-                }
-                const manifest = await response.json();
-                
-                const selector = document.getElementById('shader-selector');
-                
-                for (const shader of manifest.shaders) {
-                    const option = document.createElement('option');
-                    option.value = shader.file;
-                    option.textContent = shader.name;
-                    selector.appendChild(option);
-                }
-                
-                console.log('✅ Loaded', manifest.shaders.length, 'shaders');
-                
-                // The fallback shader already contains full raymarch code
-                console.log('✅ Using built-in raymarch shader');
-                
-                selector.addEventListener('change', async (e) => {
-                    if (e.target.value) {
-                        try {
-                            const shaderCode = await fetch(`shaders/${e.target.value}`).then(r => r.text());
-                            editor.setValue(shaderCode);
-                            await compileShader(shaderCode);
-                        } catch (err) {
-                            showError('Failed to load shader: ' + err.message);
-                        }
-                    }
-                });
-                
-            } catch (e) {
-                console.error('❌ Failed to load shaders:', e);
-                showError('Failed to load shader list. Check console for details.');
-            }
         }
         
         // ================================================
@@ -1690,22 +1218,15 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
         }
         
         function resizeCanvas() {
-            const container = document.getElementById('canvas-container');
             const dpr = window.devicePixelRatio || 1;
+            let width = window.innerWidth * dpr;
+            let height = window.innerHeight * dpr;
             
-            const maxWidth = 8192;
-            const maxHeight = 8192;
-            
-            let width = container.clientWidth * dpr;
-            let height = container.clientHeight * dpr;
-            
-            if (width > maxWidth) width = maxWidth;
-            if (height > maxHeight) height = maxHeight;
+            if (width > 8192) width = 8192;
+            if (height > 8192) height = 8192;
             
             canvas.width = width;
             canvas.height = height;
-            canvas.style.width = container.clientWidth + 'px';
-            canvas.style.height = container.clientHeight + 'px';
         }
         
         // ================================================
@@ -1740,11 +1261,9 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
                 tabSize: 2
             });
             
-            setupSceneEditor();
+            editor.setValue(mainShader);
             
-            // Set initial shader code in editor
-            editor.setValue(fallbackShader);
-            console.log('📝 Loaded built-in raymarch shader into editor');
+            setupSceneEditor();
             
             // Panel toggle
             const togglePanelBtn = document.getElementById('toggle-panel-btn');
@@ -1757,115 +1276,238 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
                 if (panelVisible) {
                     editorSide.classList.remove('panel-hidden');
                     togglePanelBtn.textContent = '✖️ Close';
-                    togglePanelBtn.classList.remove('bg-gray-600');
-                    togglePanelBtn.classList.add('bg-red-700');
                     floatingToggleBtn.classList.add('hidden');
                 } else {
                     editorSide.classList.add('panel-hidden');
                     togglePanelBtn.textContent = '🎨 Show';
-                    togglePanelBtn.classList.remove('bg-red-700');
-                    togglePanelBtn.classList.add('bg-gray-600');
                     floatingToggleBtn.classList.remove('hidden');
                 }
+                setTimeout(resizeCanvas, 350);
             }
             
             togglePanelBtn.addEventListener('click', togglePanel);
             floatingToggleBtn.addEventListener('click', togglePanel);
             
-            // Object picking setup
-            function highlightObject(obj) {
-                if (!obj) return;
-                const panel = document.getElementById(`${obj.type}-${obj.index}-panel`);
-                if (panel) {
-                    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    panel.style.border = '3px solid #fbbf24';
-                    panel.style.boxShadow = '0 0 20px rgba(251, 191, 36, 0.5)';
-                    setTimeout(() => {
-                        panel.style.border = '';
-                        panel.style.boxShadow = '';
-                    }, 2000);
-                }
+            // Mouse events for camera AND object picking
+            let clickStartX = 0, clickStartY = 0;
+            
+            // Project 3D point to screen coordinates
+            function projectToScreen(worldPos) {
+                const yaw = cameraYaw;
+                const pitch = cameraPitch;
+                const camDist = cameraDistance;
+                
+                const camPos = {
+                    x: Math.sin(yaw) * Math.cos(pitch) * camDist + cameraTargetX,
+                    y: Math.sin(pitch) * camDist + cameraTargetY,
+                    z: Math.cos(yaw) * Math.cos(pitch) * camDist + cameraTargetZ
+                };
+                
+                const camTarget = { x: cameraTargetX, y: cameraTargetY, z: cameraTargetZ };
+                
+                // Camera vectors
+                const forward = normalize(sub(camTarget, camPos));
+                const right = normalize(cross(forward, { x: 0, y: 1, z: 0 }));
+                const up = cross(right, forward);
+                
+                // Vector from camera to point
+                const toPoint = sub(worldPos, camPos);
+                
+                // Project onto camera plane
+                const focalLength = 1.5;
+                const depth = dot(toPoint, forward);
+                
+                if (depth <= 0.1) return null; // Behind camera
+                
+                const projX = dot(toPoint, right) / depth * focalLength;
+                const projY = -dot(toPoint, up) / depth * focalLength;
+                
+                // Convert to screen coordinates
+                const minDim = Math.min(canvas.width, canvas.height);
+                const screenX = canvas.width / 2 + projX * minDim;
+                const screenY = canvas.height / 2 + projY * minDim;
+                
+                return { x: screenX, y: screenY, depth: depth };
             }
             
-            function updateUIPosition(obj, pos) {
-                if (!obj || !pos) return;
+            // Find closest object to screen position
+            function pickObjectAt(screenX, screenY) {
+                let bestObj = null;
+                let bestDist = 80; // Max pixel distance to select (increased for easier picking)
+                let bestDepth = Infinity;
                 
+                // Check all spheres
+                for (let i = 0; i < activeSpheres; i++) {
+                    const offset = 4 + i * 12;
+                    const pos = { x: sceneData[offset], y: sceneData[offset + 1], z: sceneData[offset + 2] };
+                    const radius = sceneData[offset + 3];
+                    const proj = projectToScreen(pos);
+                    
+                    if (proj) {
+                        const dx = proj.x - screenX;
+                        const dy = proj.y - screenY;
+                        const screenDist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        // Account for object size in screen space
+                        const screenRadius = radius * 150 / proj.depth;
+                        const effectiveDist = Math.max(0, screenDist - screenRadius);
+                        
+                        if (effectiveDist < bestDist || (effectiveDist < bestDist + 20 && proj.depth < bestDepth)) {
+                            bestDist = effectiveDist;
+                            bestDepth = proj.depth;
+                            bestObj = { type: 'sphere', index: i };
+                        }
+                    }
+                }
+                
+                // Check all boxes
+                for (let i = 0; i < activeBoxes; i++) {
+                    const offset = 4 + 120 + i * 16;
+                    const pos = { x: sceneData[offset], y: sceneData[offset + 1], z: sceneData[offset + 2] };
+                    const size = sceneData[offset + 4];
+                    const proj = projectToScreen(pos);
+                    
+                    if (proj) {
+                        const dx = proj.x - screenX;
+                        const dy = proj.y - screenY;
+                        const screenDist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        const screenSize = size * 150 / proj.depth;
+                        const effectiveDist = Math.max(0, screenDist - screenSize);
+                        
+                        if (effectiveDist < bestDist || (effectiveDist < bestDist + 20 && proj.depth < bestDepth)) {
+                            bestDist = effectiveDist;
+                            bestDepth = proj.depth;
+                            bestObj = { type: 'box', index: i };
+                        }
+                    }
+                }
+                
+                // Check all tori
+                for (let i = 0; i < activeTori; i++) {
+                    const offset = 4 + 120 + 160 + i * 16;
+                    const pos = { x: sceneData[offset], y: sceneData[offset + 1], z: sceneData[offset + 2] };
+                    const majorR = sceneData[offset + 4];
+                    const proj = projectToScreen(pos);
+                    
+                    if (proj) {
+                        const dx = proj.x - screenX;
+                        const dy = proj.y - screenY;
+                        const screenDist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        const screenSize = majorR * 150 / proj.depth;
+                        const effectiveDist = Math.max(0, screenDist - screenSize);
+                        
+                        if (effectiveDist < bestDist || (effectiveDist < bestDist + 20 && proj.depth < bestDepth)) {
+                            bestDist = effectiveDist;
+                            bestDepth = proj.depth;
+                            bestObj = { type: 'torus', index: i };
+                        }
+                    }
+                }
+                
+                console.log('Pick result:', bestObj, 'dist:', bestDist.toFixed(1));
+                return bestObj;
+            }
+            
+            // Vector math helpers
+            function sub(a, b) { return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }; }
+            function add(a, b) { return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }; }
+            function scale(v, s) { return { x: v.x * s, y: v.y * s, z: v.z * s }; }
+            function length(v) { return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z); }
+            function normalize(v) { const l = length(v) || 1; return { x: v.x / l, y: v.y / l, z: v.z / l }; }
+            function cross(a, b) { return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x }; }
+            function dot(a, b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+            
+            // Get object position
+            function getObjectPosition(obj) {
+                let offset;
+                if (obj.type === 'sphere') offset = 4 + obj.index * 12;
+                else if (obj.type === 'box') offset = 4 + 120 + obj.index * 16;
+                else offset = 4 + 120 + 160 + obj.index * 16;
+                return { x: sceneData[offset], y: sceneData[offset + 1], z: sceneData[offset + 2] };
+            }
+            
+            // Set object position and update UI
+            function setObjectPosition(obj, pos) {
+                let offset;
+                if (obj.type === 'sphere') offset = 4 + obj.index * 12;
+                else if (obj.type === 'box') offset = 4 + 120 + obj.index * 16;
+                else offset = 4 + 120 + 160 + obj.index * 16;
+                
+                // Clamp position
+                pos.x = Math.max(-4, Math.min(4, pos.x));
+                pos.y = Math.max(-2, Math.min(3, pos.y));
+                pos.z = Math.max(-4, Math.min(4, pos.z));
+                
+                sceneData[offset] = pos.x;
+                sceneData[offset + 1] = pos.y;
+                sceneData[offset + 2] = pos.z;
+                
+                // Update sliders
                 const xSlider = document.getElementById(`${obj.type}-${obj.index}-x`);
                 const ySlider = document.getElementById(`${obj.type}-${obj.index}-y`);
                 const zSlider = document.getElementById(`${obj.type}-${obj.index}-z`);
+                if (xSlider) xSlider.value = pos.x;
+                if (ySlider) ySlider.value = pos.y;
+                if (zSlider) zSlider.value = pos.z;
                 
-                if (xSlider) {
-                    xSlider.value = pos.x;
-                    xSlider.dispatchEvent(new Event('input'));
-                }
-                if (ySlider) {
-                    ySlider.value = pos.y;
-                    ySlider.dispatchEvent(new Event('input'));
-                }
-                if (zSlider) {
-                    zSlider.value = pos.z;
-                    zSlider.dispatchEvent(new Event('input'));
-                }
+                // Update displays
+                const xVal = document.getElementById(`${obj.type}-${obj.index}-x-value`);
+                const yVal = document.getElementById(`${obj.type}-${obj.index}-y-value`);
+                const zVal = document.getElementById(`${obj.type}-${obj.index}-z-value`);
+                if (xVal) xVal.textContent = pos.x.toFixed(2);
+                if (yVal) yVal.textContent = pos.y.toFixed(2);
+                if (zVal) zVal.textContent = pos.z.toFixed(2);
                 
-                const xValue = document.getElementById(`${obj.type}-${obj.index}-x-value`);
-                const yValue = document.getElementById(`${obj.type}-${obj.index}-y-value`);
-                const zValue = document.getElementById(`${obj.type}-${obj.index}-z-value`);
-                
-                if (xValue) xValue.textContent = pos.x.toFixed(2);
-                if (yValue) yValue.textContent = pos.y.toFixed(2);
-                if (zValue) zValue.textContent = pos.z.toFixed(2);
+                // Write to GPU
+                const floatCount = obj.type === 'sphere' ? 12 : 16;
+                device.queue.writeBuffer(sceneBuffer, offset * 4, sceneData.subarray(offset, offset + floatCount));
             }
             
-            objectPicker.onObjectSelected = (obj) => {
-                console.log('✅ Selected:', obj);
-                highlightObject(obj);
-            };
-            
-            objectPicker.onObjectMoved = (obj, pos) => {
-                console.log('📍 Moved:', obj, 'to', pos);
-                updateUIPosition(obj, pos);
+            // Highlight selected panel
+            function highlightPanel(obj) {
+                // Remove previous highlights
+                document.querySelectorAll('[id$="-panel"]').forEach(p => {
+                    p.style.boxShadow = '';
+                    p.style.borderColor = '';
+                });
                 
-                // ✅ PROTECTION: Re-force header after object movement
-                // The object picker might write over the header, so we restore it
-                const headerData = new Uint32Array([activeSpheres, activeBoxes, activeTori, 0]);
-                device.queue.writeBuffer(sceneBuffer, 0, headerData);
-                console.log('🛡️ Header restored after movement:', headerData);
-            };
+                if (obj) {
+                    const panel = document.getElementById(`${obj.type}-${obj.index}-panel`);
+                    if (panel) {
+                        panel.style.boxShadow = '0 0 15px rgba(251, 191, 36, 0.6)';
+                        panel.style.borderColor = '#fbbf24';
+                        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                }
+            }
             
-            // Mouse events for object picking + camera
-            canvas.addEventListener('mousedown', async (e) => {
+            canvas.addEventListener('mousedown', (e) => {
                 const rect = canvas.getBoundingClientRect();
                 const x = (e.clientX - rect.left) * (canvas.width / rect.width);
                 const y = (e.clientY - rect.top) * (canvas.height / rect.height);
                 
+                clickStartX = e.clientX;
+                clickStartY = e.clientY;
                 lastMouseX = e.clientX;
                 lastMouseY = e.clientY;
                 
-                const yaw = cameraYaw;
-                const pitch = cameraPitch;
-                const cameraDir = {
-                    x: Math.sin(yaw) * Math.cos(pitch),
-                    y: Math.sin(pitch),
-                    z: Math.cos(yaw) * Math.cos(pitch)
-                };
-                
-                const cameraPos = {
-                    x: cameraDir.x * cameraDistance + cameraTargetX,
-                    y: cameraDir.y * cameraDistance + cameraTargetY,
-                    z: cameraDir.z * cameraDistance + cameraTargetZ
-                };
-                
-                const obj = await objectPicker.handleClick(x, y, cameraPos, cameraDir);
+                // Try to pick an object
+                const obj = pickObjectAt(x, y);
                 
                 if (obj) {
-                    isPickingMode = true;
                     selectedObject = obj;
-                    mouseDown = 1;
+                    isDraggingObject = true;
                     canvas.style.cursor = 'move';
+                    highlightPanel(obj);
                 } else {
+                    selectedObject = null;
+                    isDraggingObject = false;
                     isDragging = true;
                     mouseDown = 1;
                     canvas.style.cursor = 'grabbing';
+                    highlightPanel(null);
                 }
             });
             
@@ -1874,38 +1516,31 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
                 mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
                 mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
                 
-                if (isPickingMode && selectedObject) {
-                    const deltaX = e.clientX - lastMouseX;
-                    const deltaY = e.clientY - lastMouseY;
-                    
+                const deltaX = e.clientX - lastMouseX;
+                const deltaY = e.clientY - lastMouseY;
+                
+                if (isDraggingObject && selectedObject) {
+                    // Move object in world space
                     const yaw = cameraYaw;
-                    const pitch = cameraPitch;
-                    const cameraDir = {
-                        x: Math.sin(yaw) * Math.cos(pitch),
-                        y: Math.sin(pitch),
-                        z: Math.cos(yaw) * Math.cos(pitch)
+                    
+                    // Camera right vector (in XZ plane)
+                    const rightX = Math.cos(yaw);
+                    const rightZ = -Math.sin(yaw);
+                    
+                    // Movement speed based on camera distance
+                    const speed = 0.004 * cameraDistance;
+                    
+                    const currentPos = getObjectPosition(selectedObject);
+                    const newPos = {
+                        x: currentPos.x + rightX * deltaX * speed,
+                        y: currentPos.y - deltaY * speed,
+                        z: currentPos.z + rightZ * deltaX * speed
                     };
                     
-                    const cameraPos = {
-                        x: cameraDir.x * cameraDistance + cameraTargetX,
-                        y: cameraDir.y * cameraDistance + cameraTargetY,
-                        z: cameraDir.z * cameraDistance + cameraTargetZ
-                    };
-                    
-                    objectPicker.handleDrag(deltaX, deltaY, cameraPos, cameraDir);
-                    
-                    // ✅ FIX: Don't write the whole buffer with Float32Array - it corrupts the header!
-                    // The object picker and updaters handle their own writes
-                    // Just restore the header to be safe
-                    if (device && sceneBuffer) {
-                        const headerData = new Uint32Array([activeSpheres, activeBoxes, activeTori, 0]);
-                        device.queue.writeBuffer(sceneBuffer, 0, headerData);
-                    }
+                    setObjectPosition(selectedObject, newPos);
                     
                 } else if (isDragging) {
-                    const deltaX = e.clientX - lastMouseX;
-                    const deltaY = e.clientY - lastMouseY;
-                    
+                    // Camera rotation/pan
                     if (e.shiftKey) {
                         const panSpeed = 0.005;
                         cameraTargetX -= deltaX * panSpeed * cameraDistance;
@@ -1923,17 +1558,15 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
             });
             
             canvas.addEventListener('mouseup', () => {
-                isPickingMode = false;
-                selectedObject = null;
                 isDragging = false;
+                isDraggingObject = false;
                 mouseDown = 0;
                 canvas.style.cursor = 'grab';
             });
             
             canvas.addEventListener('mouseleave', () => {
-                isPickingMode = false;
-                selectedObject = null;
                 isDragging = false;
+                isDraggingObject = false;
                 mouseDown = 0;
                 canvas.style.cursor = 'grab';
             });
@@ -1941,62 +1574,11 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
             canvas.addEventListener('wheel', (e) => {
                 e.preventDefault();
                 const zoomSpeed = 0.001;
-                cameraDistance += e.deltaY * zoomSpeed;
+                cameraDistance += e.deltaY * zoomSpeed * cameraDistance;
                 cameraDistance = Math.max(1.0, Math.min(20.0, cameraDistance));
             }, { passive: false });
             
             canvas.style.cursor = 'grab';
-            
-            // Touch controls
-            let lastTouchDistance = 0;
-            let touchStartYaw = 0;
-            let touchStartPitch = 0;
-            
-            canvas.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                if (e.touches.length === 1) {
-                    isDragging = true;
-                    lastMouseX = e.touches[0].clientX;
-                    lastMouseY = e.touches[0].clientY;
-                    touchStartYaw = cameraYaw;
-                    touchStartPitch = cameraPitch;
-                } else if (e.touches.length === 2) {
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    lastTouchDistance = Math.sqrt(dx * dx + dy * dy);
-                }
-            }, { passive: false });
-            
-            canvas.addEventListener('touchmove', (e) => {
-                e.preventDefault();
-                if (e.touches.length === 1 && isDragging) {
-                    const deltaX = e.touches[0].clientX - lastMouseX;
-                    const deltaY = e.touches[0].clientY - lastMouseY;
-                    
-                    const rotateSpeed = 0.01;
-                    cameraYaw = touchStartYaw - deltaX * rotateSpeed;
-                    cameraPitch = touchStartPitch + deltaY * rotateSpeed;
-                    cameraPitch = Math.max(0.05, Math.min(1.5, cameraPitch));
-                    
-                } else if (e.touches.length === 2) {
-                    const dx = e.touches[0].clientX - e.touches[1].clientX;
-                    const dy = e.touches[0].clientY - e.touches[1].clientY;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    const delta = distance - lastTouchDistance;
-                    cameraDistance -= delta * 0.01;
-                    cameraDistance = Math.max(1.0, Math.min(20.0, cameraDistance));
-                    
-                    lastTouchDistance = distance;
-                }
-            }, { passive: false });
-            
-            canvas.addEventListener('touchend', () => {
-                isDragging = false;
-            });
-            
-            // Load shaders
-            await loadShaders();
             
             // Compile button
             document.getElementById('compile-btn').addEventListener('click', () => {
@@ -2013,7 +1595,7 @@ fn get_normal(p: vec3<f32>) -> vec3<f32> {
             window.addEventListener('resize', resizeCanvas);
             render();
             
-            console.log('✅ WebGPU Scene Editor initialized - ZERO OBJECTS START');
+            console.log('✅ WebGPU Scene Editor with CSG initialized');
         })();
     </script>
 </body>
