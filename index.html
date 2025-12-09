@@ -64,14 +64,6 @@
         input[type="range"]::-webkit-slider-thumb:hover {
             background: #8ec07c;
         }
-        input[type="range"]::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: #83a598;
-            cursor: pointer;
-            border: 2px solid #1d2021;
-        }
 
         /* Layout */
         body, html {
@@ -105,27 +97,58 @@
             display: block;
         }
         
+        /* EDITOR SIDE PANEL STYLES */
         #editor-side {
             position: absolute;
             top: 20px;
             right: 20px;
+            /* Default 'Expanded' State */
             width: 50%;
-            max-width: 800px;
+            max-width: 900px;
             height: calc(100vh - 40px);
             z-index: 10;
             display: flex;
             flex-direction: column;
             border-radius: 8px;
             overflow: hidden;
+            background: #1d2021; /* Solid background when expanded */
             box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            transition: transform 0.3s ease, opacity 0.3s ease;
+            border: 1px solid #3c3836;
+            transition: width 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
         }
         
-        #editor-side.panel-hidden {
-            transform: translateX(calc(100% + 20px));
-            opacity: 0;
-            pointer-events: none;
+        /* COMPACT / MINIMIZED MODE */
+        #editor-side.compact-mode {
+            width: 322px; /* Fits exactly the side panel + borders */
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            pointer-events: none; /* Let clicks pass through empty space */
         }
+        
+        #editor-side.compact-mode > * {
+            pointer-events: auto; /* Re-enable clicks on children */
+        }
+
+        #editor-side.compact-mode #code-editor-wrapper {
+            display: none !important;
+        }
+
+        /* Clean up header in compact mode */
+        #editor-side.compact-mode #header-bar {
+            background: #1d2021;
+            border-radius: 8px 8px 0 0;
+            border: 1px solid #3c3836;
+            border-bottom: 1px solid #3c3836;
+        }
+
+        #editor-side.compact-mode #side-panel {
+            border-radius: 0 0 8px 8px;
+            border: 1px solid #3c3836;
+            border-top: none;
+            height: calc(100% - 50px); /* Adjust for header */
+        }
+
         #editor-main {
             display: flex;
             flex: 1;
@@ -136,14 +159,12 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            min-width: 0; /* Important for flex shrinking */
         }
         .CodeMirror {
             flex: 1;
             height: auto;
             width: 100%;
-            max-width: 100%;
-            -webkit-box-sizing: border-box;
-            box-sizing: border-box;
         }
         
         #side-panel {
@@ -173,36 +194,33 @@
         <div id="canvas-container" class="relative bg-black flex items-center justify-center">
             <canvas id="canvas" class="block"></canvas>
             
-            <div id="error-message" class="absolute bottom-4 left-4 right-4 bg-red-900/90 text-red-200 p-3 rounded text-xs font-mono hidden max-h-32 overflow-auto">
+            <div id="error-message" class="absolute bottom-4 left-4 right-4 bg-red-900/90 text-red-200 p-3 rounded text-xs font-mono hidden max-h-32 overflow-auto" style="z-index: 20;">
             </div>
             
             <div class="absolute top-4 left-4 bg-black/70 px-3 py-2 rounded text-sm font-mono">
                 <span class="text-gray-400">FPS:</span> <span id="fps" class="text-green-400">0</span>
             </div>
             
-            <button id="floating-toggle-btn" class="absolute top-4 right-4 bg-blue-700 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-lg transition hidden" style="z-index: 5;">
-                🎨 Show Editor
-            </button>
-        </div>
+            </div>
         
-        <div id="editor-side" class="bg-gray-800">
+        <div id="editor-side">
             
-            <div class="bg-[#1d2021] border-b border-gray-700 p-3 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-blue-400">
+            <div id="header-bar" class="bg-[#1d2021] border-b border-gray-700 p-3 flex items-center justify-between h-[50px]">
+                <div class="flex items-center gap-3 overflow-hidden">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-blue-400 flex-shrink-0">
                         <path d="M12 2L2 7L12 12L22 7L12 2Z"/>
                         <path d="M2 17L12 22L22 17"/>
                         <path d="M2 12L12 17L22 12"/>
                     </svg>
-                    <span class="font-bold text-gray-200">WebGPU Scene Editor - CSG</span>
+                    <span id="header-title" class="font-bold text-gray-200 whitespace-nowrap text-sm">WebGPU Scene</span>
                 </div>
                 
-                <div class="flex items-center gap-3">
-                    <button id="compile-btn" class="bg-green-700 hover:bg-green-600 text-white px-4 py-1 rounded text-sm font-semibold transition">
-                        Compile
+                <div class="flex items-center gap-2">
+                    <button id="toggle-code-btn" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs font-semibold transition flex items-center gap-1 border border-gray-600" title="Toggle Code Editor">
+                        📝 Code
                     </button>
-                    <button id="toggle-panel-btn" class="bg-blue-700 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm font-semibold transition" title="Toggle Scene Panel">
-                        ✖️ Close
+                    <button id="compile-btn" class="bg-green-700 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-semibold transition border border-green-800">
+                        ▶ Run
                     </button>
                 </div>
             </div>
@@ -216,8 +234,8 @@
                 <div id="side-panel" class="bg-[#1d2021] border-l border-gray-700 overflow-y-auto">
                     
                     <div class="p-4 border-b border-gray-700">
-                        <h3 class="font-bold text-gray-200 mb-3 flex items-center gap-2">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <h3 class="font-bold text-gray-200 mb-3 flex items-center gap-2 text-sm">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="3" y="3" width="7" height="7"/>
                                 <rect x="14" y="3" width="7" height="7"/>
                                 <rect x="14" y="14" width="7" height="7"/>
@@ -226,7 +244,7 @@
                             System Uniforms
                         </h3>
                         <div class="space-y-2 text-xs font-mono text-gray-400">
-                            <div><span class="text-gray-500">Resolution:</span> <span id="u-resolution">0x0</span></div>
+                            <div><span class="text-gray-500">Res:</span> <span id="u-resolution">0x0</span></div>
                             <div><span class="text-gray-500">Time:</span> <span id="u-time">0.00s</span></div>
                             <div><span class="text-gray-500">Frame:</span> <span id="u-frame">0</span></div>
                             <div><span class="text-gray-500">Mouse:</span> <span id="u-mouse">(0, 0)</span></div>
@@ -234,76 +252,62 @@
                     </div>
                     
                     <div class="p-4">
-                        <h3 class="font-bold text-gray-200 mb-3 flex items-center gap-2">
+                        <h3 class="font-bold text-gray-200 mb-3 flex items-center gap-2 text-sm">
                             🎨 Scene Editor (CSG)
                         </h3>
                         
-                        <!-- OBJECT MANAGER -->
-                        <div class="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-600">
-                            <div class="text-sm font-semibold text-cyan-400 mb-3">🎛️ Object Manager</div>
+                        <div class="mb-6 p-3 bg-gray-800 rounded-lg border border-gray-600">
+                            <div class="text-xs font-semibold text-cyan-400 mb-2">🎛️ Manager</div>
                             
-                            <div class="flex gap-2 mb-3">
-                                <button id="add-sphere-btn" class="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded font-semibold transition-colors">
-                                    ➕ Sphere
+                            <div class="flex gap-1 mb-2">
+                                <button id="add-sphere-btn" class="flex-1 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors">
+                                    +Sphere
                                 </button>
-                                <button id="remove-sphere-btn" class="flex-1 px-3 py-2 bg-red-900 hover:bg-red-800 text-white text-sm rounded transition-colors">
-                                    ➖
+                                <button id="remove-sphere-btn" class="px-2 py-1 bg-red-900 hover:bg-red-800 text-white text-xs rounded transition-colors">
+                                    -
                                 </button>
                             </div>
                             
-                            <div class="flex gap-2 mb-3">
-                                <button id="add-box-btn" class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-semibold transition-colors">
-                                    ➕ Box
+                            <div class="flex gap-1 mb-2">
+                                <button id="add-box-btn" class="flex-1 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors">
+                                    +Box
                                 </button>
-                                <button id="remove-box-btn" class="flex-1 px-3 py-2 bg-green-900 hover:bg-green-800 text-white text-sm rounded transition-colors">
-                                    ➖
-                                </button>
-                            </div>
-                            
-                            <div class="flex gap-2">
-                                <button id="add-torus-btn" class="flex-1 px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded font-semibold transition-colors">
-                                    ➕ Torus
-                                </button>
-                                <button id="remove-torus-btn" class="flex-1 px-3 py-2 bg-cyan-900 hover:bg-cyan-800 text-white text-sm rounded transition-colors">
-                                    ➖
+                                <button id="remove-box-btn" class="px-2 py-1 bg-green-900 hover:bg-green-800 text-white text-xs rounded transition-colors">
+                                    -
                                 </button>
                             </div>
                             
-                            <div class="mt-3 p-2 bg-gray-900 rounded text-xs text-gray-400">
+                            <div class="flex gap-1">
+                                <button id="add-torus-btn" class="flex-1 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded transition-colors">
+                                    +Torus
+                                </button>
+                                <button id="remove-torus-btn" class="px-2 py-1 bg-cyan-900 hover:bg-cyan-800 text-white text-xs rounded transition-colors">
+                                    -
+                                </button>
+                            </div>
+                            
+                            <div class="mt-3 p-2 bg-gray-900 rounded text-[10px] text-gray-400 font-mono">
                                 <div class="flex justify-between">
-                                    <span>Spheres:</span>
-                                    <span id="sphere-count" class="font-mono text-red-400">0</span>
+                                    <span>Spheres:</span><span id="sphere-count" class="text-red-400">0</span>
                                 </div>
-                                <div class="flex justify-between mt-1">
-                                    <span>Boxes:</span>
-                                    <span id="box-count" class="font-mono text-green-400">0</span>
+                                <div class="flex justify-between">
+                                    <span>Boxes:</span><span id="box-count" class="text-green-400">0</span>
                                 </div>
-                                <div class="flex justify-between mt-1">
-                                    <span>Tori:</span>
-                                    <span id="torus-count" class="font-mono text-cyan-400">0</span>
+                                <div class="flex justify-between">
+                                    <span>Tori:</span><span id="torus-count" class="text-cyan-400">0</span>
                                 </div>
-                            </div>
-                            
-                            <div class="mt-3 p-2 bg-purple-900/30 rounded text-xs text-purple-300">
-                                <div class="font-semibold mb-1">💡 CSG Modes:</div>
-                                <div>• Normal: Suit le smooth actif</div>
-                                <div>• Smooth: Fusionne (propage!)</div>
-                                <div>• Subtract: Creuse la scène</div>
-                                <div>• Intersect: Garde l'overlap</div>
                             </div>
 
-                            <div class="mt-3 p-2 bg-gray-800 rounded text-sm text-gray-200">
-                                <label class="flex items-center gap-2">
-                                    <input type="checkbox" id="toggle-subtract-normal" class="w-4 h-4">
-                                    <span>Traiter les objets <strong>Subtract</strong> comme <em>Normal</em></span>
+                            <div class="mt-3 p-2 bg-gray-800 rounded text-xs text-gray-200">
+                                <label class="flex items-start gap-2 cursor-pointer">
+                                    <input type="checkbox" id="toggle-subtract-normal" class="w-3 h-3 mt-1">
+                                    <span class="text-[10px] leading-tight">Force <strong>Subtract</strong> as <em>Normal</em></span>
                                 </label>
                             </div>
                         </div>
                         
-                        <!-- DYNAMIC PANELS CONTAINER -->
                         <div id="object-panels-container">
-                            <!-- Panels will be generated dynamically -->
-                        </div>
+                            </div>
                         
                     </div>
                 </div>
@@ -1355,28 +1359,31 @@ fn fs_main(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
             
             setupSceneEditor();
             
-            // Panel toggle
-            const togglePanelBtn = document.getElementById('toggle-panel-btn');
-            const floatingToggleBtn = document.getElementById('floating-toggle-btn');
+            // Panel toggle Logic - UPDATED
+            const toggleCodeBtn = document.getElementById('toggle-code-btn');
             const editorSide = document.getElementById('editor-side');
-            let panelVisible = true;
+            let isCodeVisible = true;
             
             function togglePanel() {
-                panelVisible = !panelVisible;
-                if (panelVisible) {
-                    editorSide.classList.remove('panel-hidden');
-                    togglePanelBtn.textContent = '✖️ Close';
-                    floatingToggleBtn.classList.add('hidden');
+                isCodeVisible = !isCodeVisible;
+                
+                if (isCodeVisible) {
+                    // EXPAND
+                    editorSide.classList.remove('compact-mode');
+                    toggleCodeBtn.innerHTML = '📝 Code';
+                    toggleCodeBtn.classList.add('bg-gray-700');
+                    toggleCodeBtn.classList.remove('bg-blue-600');
                 } else {
-                    editorSide.classList.add('panel-hidden');
-                    togglePanelBtn.textContent = '🎨 Show';
-                    floatingToggleBtn.classList.remove('hidden');
+                    // COLLAPSE (Mini Mode)
+                    editorSide.classList.add('compact-mode');
+                    toggleCodeBtn.innerHTML = '➕ Show Code';
+                    toggleCodeBtn.classList.remove('bg-gray-700');
+                    toggleCodeBtn.classList.add('bg-blue-600');
                 }
                 setTimeout(resizeCanvas, 350);
             }
             
-            togglePanelBtn.addEventListener('click', togglePanel);
-            floatingToggleBtn.addEventListener('click', togglePanel);
+            toggleCodeBtn.addEventListener('click', togglePanel);
 
             // Global toggle control: treat Subtract as Normal
             const toggleSubtractNormalCheckbox = document.getElementById('toggle-subtract-normal');
